@@ -621,23 +621,32 @@
       </div>
     </div>
 
+    <!-- Connection Diagnostics (shown when having trouble) -->
+    <div class="card" id="diag-card" style="display:none;">
+      <div class="card-title">Connection Diagnostics</div>
+      <div id="diag-log" style="font-family:monospace;font-size:11px;color:var(--text-dim);max-height:200px;overflow-y:auto;line-height:1.6;"></div>
+      <button class="btn btn-full" onclick="runDiagnostics()" style="margin-top:10px;">Re-run diagnostics</button>
+    </div>
+
   </div>
 
   <div class="toast" id="toast"></div>
 
   <script>
     // ── State ────────────────────────────────────────
-    let ws;
+    let ws = null;
+    let wsConnectTimer = null;
+    let reconnectDelay = 1000;
     let myClientId = null;
     let isHost = false;
-    let clockOffset = 0; // server_time = local_time - offset
+    let clockOffset = 0;
     let audioCtx = null;
     let audioBuffer = null;
     let sourceNode = null;
     let gainNode = null;
     let isPlaying = false;
-    let playStartLocalTime = 0; // local time when playback started
-    let playStartOffset = 0; // audio offset at play start
+    let playStartLocalTime = 0;
+    let playStartOffset = 0;
     let currentTrackUrl = null;
     let progressRAF = null;
 
@@ -665,6 +674,18 @@
     const volumeSlider = $('#volume');
     const deviceList = $('#device-list');
     const toast = $('#toast');
+    const diagCard = $('#diag-card');
+    const diagLog = $('#diag-log');
+
+    // ── Diagnostics log ──────────────────────────────
+    function dlog(msg, type = 'info') {
+      const colors = { ok: '#00b894', fail: '#e17055', info: '#8888a8', warn: '#fdcb6e' };
+      const prefix = { ok: 'OK', fail: 'FAIL', info: 'INFO', warn: 'WARN' };
+      const line = document.createElement('div');
+      line.innerHTML = `<span style="color:${colors[type]}">[${prefix[type]}]</span> ${msg}`;
+      diagLog.appendChild(line);
+      diagLog.scrollTop = diagLog.scrollHeight;
+    }
 
     // ── Audio Context ────────────────────────────────
     function ensureAudioCtx() {
@@ -678,27 +699,80 @@
       }
     }
 
-    // ── WebSocket ────────────────────────────────────
+    // ── WebSocket (with proper error handling + reconnect) ──
     function connect() {
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      ws = new WebSocket(`${proto}://${location.host}`);
+      // Clean up any existing connection
+      if (ws) {
+        try { ws.onclose = null; ws.onerror = null; ws.close(); } catch {}
+        ws = null;
+      }
+      if (wsConnectTimer) { clearTimeout(wsConnectTimer); wsConnectTimer = null; }
+
+      const wsUrl = `ws://${location.host}`;
+
+      connDot.classList.add('disconnected');
+      connText.textContent = 'Connecting...';
+
+      // Set a connection timeout — if WS doesn't open in 5s, something is wrong
+      let opened = false;
+      wsConnectTimer = setTimeout(() => {
+        if (!opened) {
+          dlog(`WebSocket connection timed out after 5s to ${wsUrl}`, 'fail');
+          dlog('This usually means a firewall is blocking the port, or the server is not running', 'warn');
+          diagCard.style.display = '';
+          try { ws.close(); } catch {}
+          scheduleReconnect();
+        }
+      }, 5000);
+
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (err) {
+        dlog(`WebSocket constructor failed: ${err.message}`, 'fail');
+        diagCard.style.display = '';
+        scheduleReconnect();
+        return;
+      }
 
       ws.onopen = () => {
+        opened = true;
+        clearTimeout(wsConnectTimer);
+        reconnectDelay = 1000; // reset backoff
         connDot.classList.remove('disconnected');
         connText.textContent = 'Connected';
+        dlog(`WebSocket connected to ${wsUrl}`, 'ok');
       };
 
-      ws.onclose = () => {
+      ws.onerror = (evt) => {
+        // onerror fires before onclose — log the error
+        dlog(`WebSocket error (server: ${location.host})`, 'fail');
+        diagCard.style.display = '';
+      };
+
+      ws.onclose = (evt) => {
+        opened = false;
+        clearTimeout(wsConnectTimer);
         connDot.classList.add('disconnected');
         connText.textContent = 'Disconnected';
-        // Reconnect after 2s
-        setTimeout(connect, 2000);
+        dlog(`WebSocket closed (code=${evt.code}, reason=${evt.reason || 'none'})`, 'warn');
+        scheduleReconnect();
       };
 
       ws.onmessage = (e) => {
-        const msg = JSON.parse(e.data);
+        let msg;
+        try { msg = JSON.parse(e.data); } catch { return; }
         handleServerMessage(msg);
       };
+    }
+
+    function scheduleReconnect() {
+      const delay = Math.min(reconnectDelay, 10000);
+      dlog(`Reconnecting in ${delay / 1000}s...`, 'info');
+      connText.textContent = `Reconnecting in ${delay / 1000}s...`;
+      wsConnectTimer = setTimeout(() => {
+        reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
+        connect();
+      }, delay);
     }
 
     function sendMsg(obj) {
@@ -1443,10 +1517,101 @@
       }
     });
 
+    // ── Connectivity diagnostics ────────────────────
+    async function runDiagnostics() {
+      diagLog.innerHTML = '';
+      diagCard.style.display = '';
+      dlog(`Page served from: ${location.href}`, 'info');
+      dlog(`Protocol: ${location.protocol}, Host: ${location.host}`, 'info');
+
+      if (location.protocol === 'https:') {
+        dlog('Page loaded over HTTPS — WebSocket needs WSS which requires SSL cert on server', 'fail');
+        dlog('Fix: Access the page via HTTP (not HTTPS)', 'warn');
+      }
+
+      // Test 1: HTTP connectivity to /health
+      dlog('Testing HTTP connectivity to server...', 'info');
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch('/health', { signal: controller.signal });
+        clearTimeout(timeout);
+        if (res.ok) {
+          const data = await res.json();
+          dlog(`HTTP OK — server responded (${data.clients} clients connected)`, 'ok');
+        } else {
+          dlog(`HTTP error: status ${res.status}`, 'fail');
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          dlog('HTTP request timed out after 5s', 'fail');
+        } else {
+          dlog(`HTTP failed: ${err.message}`, 'fail');
+        }
+        dlog('The server may not be running, or a firewall is blocking the port', 'warn');
+        return;
+      }
+
+      // Test 2: WebSocket connectivity
+      dlog('Testing WebSocket connectivity...', 'info');
+      try {
+        const testWs = await new Promise((resolve, reject) => {
+          const s = new WebSocket(`ws://${location.host}`);
+          const t = setTimeout(() => { s.close(); reject(new Error('timeout')); }, 5000);
+          s.onopen = () => { clearTimeout(t); resolve(s); };
+          s.onerror = () => { clearTimeout(t); reject(new Error('connection refused')); };
+        });
+        dlog('WebSocket connected successfully', 'ok');
+        testWs.close();
+      } catch (err) {
+        dlog(`WebSocket failed: ${err.message}`, 'fail');
+        if (location.protocol === 'https:') {
+          dlog('Likely cause: page served over HTTPS but WS server is HTTP only', 'warn');
+        } else {
+          dlog('Likely cause: firewall, proxy, or antivirus blocking WebSocket upgrade', 'warn');
+        }
+      }
+
+      // Test 3: Show network info
+      dlog('Fetching server network info...', 'info');
+      try {
+        const res = await fetch('/connection-info');
+        const info = await res.json();
+        if (info.ips && info.ips.length > 0) {
+          for (const ip of info.ips) {
+            dlog(`Server IP: ${ip.address} (${ip.name})`, 'info');
+          }
+        } else {
+          dlog('Server has no detectable network interfaces!', 'fail');
+        }
+      } catch {}
+    }
+
     // ── Init ─────────────────────────────────────────
-    connect();
-    loadTrackList();
-    loadConnectionInfo();
+    // First test HTTP, then connect WebSocket
+    async function init() {
+      loadTrackList();
+      loadConnectionInfo();
+
+      // Quick HTTP pre-check — if this fails, show diagnostics immediately
+      try {
+        const res = await fetch('/health');
+        if (res.ok) {
+          connect(); // HTTP works, proceed to WebSocket
+        } else {
+          dlog('Server returned non-OK status', 'fail');
+          diagCard.style.display = '';
+          connect(); // try anyway
+        }
+      } catch (err) {
+        dlog(`Cannot reach server: ${err.message}`, 'fail');
+        diagCard.style.display = '';
+        runDiagnostics();
+        connect(); // try anyway, will retry
+      }
+    }
+
+    init();
 
     // Activate audio context on first user interaction (mobile requirement)
     document.addEventListener('click', () => ensureAudioCtx(), { once: true });
