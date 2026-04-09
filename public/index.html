@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Audio Amp — Multi-Device Sync</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #141420;
+      --surface2: #1c1c2e;
+      --border: #2a2a40;
+      --primary: #6c5ce7;
+      --primary-glow: rgba(108, 92, 231, 0.3);
+      --accent: #00cec9;
+      --accent-glow: rgba(0, 206, 201, 0.3);
+      --text: #e8e8f0;
+      --text-dim: #8888a8;
+      --success: #00b894;
+      --warning: #fdcb6e;
+      --danger: #e17055;
+      --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ──────────────────────────────────── */
+    .header {
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .connection-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+    }
+
+    .connection-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    .connection-dot.disconnected {
+      background: var(--danger);
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Main Layout ─────────────────────────────── */
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* ── Cards ────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+    }
+
+    /* ── Sync Status ─────────────────────────────── */
+    .sync-status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: var(--radius);
+      background: var(--surface2);
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .sync-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .sync-icon.synced { background: rgba(0, 184, 148, 0.15); }
+    .sync-icon.syncing { background: rgba(253, 203, 110, 0.15); animation: spin 1s linear infinite; }
+    .sync-icon.error { background: rgba(225, 112, 85, 0.15); }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .sync-info h3 { font-size: 15px; font-weight: 600; }
+    .sync-info p { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+    /* ── Upload Area ─────────────────────────────── */
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .upload-area:hover, .upload-area.dragover {
+      border-color: var(--primary);
+      background: var(--primary-glow);
+    }
+
+    .upload-area .icon { font-size: 32px; margin-bottom: 8px; }
+    .upload-area p { color: var(--text-dim); font-size: 14px; }
+    .upload-area .formats { font-size: 11px; color: var(--text-dim); margin-top: 6px; opacity: 0.6; }
+
+    #file-input { display: none; }
+
+    /* ── Track Info ───────────────────────────────── */
+    .track-info {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 0;
+    }
+
+    .track-art {
+      width: 56px;
+      height: 56px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .track-details { flex: 1; min-width: 0; }
+    .track-name {
+      font-size: 16px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-meta { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+
+    /* ── Waveform / Progress ─────────────────────── */
+    .progress-container {
+      margin: 16px 0;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    .time-display {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Controls ─────────────────────────────────── */
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 8px 0;
+    }
+
+    .ctrl-btn {
+      background: none;
+      border: none;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 22px;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.15s;
+    }
+
+    .ctrl-btn:hover { background: var(--surface2); }
+    .ctrl-btn:active { transform: scale(0.92); }
+
+    .ctrl-btn.play-btn {
+      width: 64px;
+      height: 64px;
+      font-size: 28px;
+      background: linear-gradient(135deg, var(--primary), #8b5cf6);
+      box-shadow: 0 4px 20px var(--primary-glow);
+    }
+
+    .ctrl-btn.play-btn:hover {
+      box-shadow: 0 6px 30px var(--primary-glow);
+      transform: scale(1.05);
+    }
+
+    /* ── Volume ───────────────────────────────────── */
+    .volume-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+    }
+
+    .volume-row .icon { font-size: 18px; }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      background: var(--primary);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 8px var(--primary-glow);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      background: var(--primary);
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+    }
+
+    /* ── Device List ──────────────────────────────── */
+    .device-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--surface2);
+      border-radius: 10px;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .device-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--primary-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .device-details { flex: 1; }
+    .device-name { font-size: 14px; font-weight: 500; }
+    .device-status { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+    .host-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--accent-glow);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    /* ── Tracks list ─────────────────────────────── */
+    .track-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--surface2);
+      border-radius: 10px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      transition: all 0.15s;
+    }
+
+    .track-item:hover {
+      border-color: var(--primary);
+      background: var(--primary-glow);
+    }
+
+    .track-item.active {
+      border-color: var(--primary);
+    }
+
+    .track-item .icon { font-size: 20px; }
+    .track-item .name {
+      flex: 1;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Resync button ───────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn:hover { border-color: var(--primary); background: var(--primary-glow); }
+    .btn-full { width: 100%; justify-content: center; }
+
+    /* ── Toast ────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      padding: 12px 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 13px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+      transition: transform 0.3s ease;
+      z-index: 100;
+      white-space: nowrap;
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ── Empty state ─────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 20px;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    /* ── Responsive ───────────────────────────────── */
+    @media (max-width: 360px) {
+      .container { padding: 12px; }
+      .card { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">&#9835;</div>
+      <span>AudioAmp</span>
+    </div>
+    <div class="connection-badge">
+      <div class="connection-dot" id="conn-dot"></div>
+      <span id="conn-text">Connecting...</span>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Sync Status -->
+    <div class="sync-status" id="sync-status">
+      <div class="sync-icon syncing" id="sync-icon">&#8635;</div>
+      <div class="sync-info">
+        <h3 id="sync-title">Synchronizing...</h3>
+        <p id="sync-detail">Calculating clock offset</p>
+      </div>
+    </div>
+
+    <!-- Upload -->
+    <div class="card" id="upload-card">
+      <div class="card-title">Load Audio</div>
+      <div class="upload-area" id="upload-area">
+        <div class="icon">&#127925;</div>
+        <p>Tap to upload or drag audio file</p>
+        <div class="formats">MP3, WAV, OGG, M4A, AAC, FLAC</div>
+      </div>
+      <input type="file" id="file-input" accept="audio/*">
+    </div>
+
+    <!-- Saved Tracks -->
+    <div class="card" id="tracks-card" style="display:none;">
+      <div class="card-title">Tracks</div>
+      <div id="tracks-list"></div>
+    </div>
+
+    <!-- Now Playing -->
+    <div class="card" id="player-card" style="display:none;">
+      <div class="card-title">Now Playing</div>
+
+      <div class="track-info">
+        <div class="track-art">&#9835;</div>
+        <div class="track-details">
+          <div class="track-name" id="track-name">—</div>
+          <div class="track-meta" id="track-meta">Ready to play</div>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-container">
+        <div class="progress-bar-bg" id="progress-bg">
+          <div class="progress-bar-fill" id="progress-fill"></div>
+        </div>
+        <div class="time-display">
+          <span id="time-current">0:00</span>
+          <span id="time-total">0:00</span>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls">
+        <button class="ctrl-btn" id="btn-stop" title="Stop">&#9632;</button>
+        <button class="ctrl-btn play-btn" id="btn-play" title="Play">&#9654;</button>
+        <button class="ctrl-btn" id="btn-resync" title="Re-sync all devices">&#8635;</button>
+      </div>
+
+      <!-- Volume -->
+      <div class="volume-row">
+        <span class="icon">&#128264;</span>
+        <input type="range" id="volume" min="0" max="1" step="0.01" value="1">
+        <span class="icon">&#128266;</span>
+      </div>
+    </div>
+
+    <!-- Connected Devices -->
+    <div class="card">
+      <div class="card-title">Connected Devices</div>
+      <div id="device-list">
+        <div class="empty-state">Waiting for devices...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ── State ────────────────────────────────────────
+    let ws;
+    let myClientId = null;
+    let isHost = false;
+    let clockOffset = 0; // server_time = local_time - offset
+    let audioCtx = null;
+    let audioBuffer = null;
+    let sourceNode = null;
+    let gainNode = null;
+    let isPlaying = false;
+    let playStartLocalTime = 0; // local time when playback started
+    let playStartOffset = 0; // audio offset at play start
+    let currentTrackUrl = null;
+    let progressRAF = null;
+
+    // ── DOM refs ─────────────────────────────────────
+    const $ = (sel) => document.querySelector(sel);
+    const connDot = $('#conn-dot');
+    const connText = $('#conn-text');
+    const syncIcon = $('#sync-icon');
+    const syncTitle = $('#sync-title');
+    const syncDetail = $('#sync-detail');
+    const uploadArea = $('#upload-area');
+    const fileInput = $('#file-input');
+    const playerCard = $('#player-card');
+    const tracksCard = $('#tracks-card');
+    const tracksList = $('#tracks-list');
+    const trackName = $('#track-name');
+    const trackMeta = $('#track-meta');
+    const progressBg = $('#progress-bg');
+    const progressFill = $('#progress-fill');
+    const timeCurrent = $('#time-current');
+    const timeTotal = $('#time-total');
+    const btnPlay = $('#btn-play');
+    const btnStop = $('#btn-stop');
+    const btnResync = $('#btn-resync');
+    const volumeSlider = $('#volume');
+    const deviceList = $('#device-list');
+    const toast = $('#toast');
+
+    // ── Audio Context ────────────────────────────────
+    function ensureAudioCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        gainNode = audioCtx.createGain();
+        gainNode.connect(audioCtx.destination);
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // ── WebSocket ────────────────────────────────────
+    function connect() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${proto}://${location.host}`);
+
+      ws.onopen = () => {
+        connDot.classList.remove('disconnected');
+        connText.textContent = 'Connected';
+      };
+
+      ws.onclose = () => {
+        connDot.classList.add('disconnected');
+        connText.textContent = 'Disconnected';
+        // Reconnect after 2s
+        setTimeout(connect, 2000);
+      };
+
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        handleServerMessage(msg);
+      };
+    }
+
+    function sendMsg(obj) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(obj));
+      }
+    }
+
+    // ── Handle server messages ───────────────────────
+    function handleServerMessage(msg) {
+      switch (msg.type) {
+        case 'welcome':
+          myClientId = msg.clientId;
+          isHost = msg.isHost;
+          connText.textContent = `Device #${msg.clientId}`;
+          if (msg.currentTrack) {
+            loadTrack(msg.currentTrack.url, msg.currentTrack.filename);
+          }
+          break;
+
+        case 'you-are-host':
+          isHost = true;
+          showToast('You are now the host');
+          break;
+
+        case 'ping':
+          // Respond immediately for clock sync
+          sendMsg({ type: 'pong', t0: msg.t0, clientTime: Date.now() });
+          setSyncState('syncing', 'Synchronizing...', 'Measuring clock offset...');
+          break;
+
+        case 'sync-done':
+          clockOffset = msg.offset;
+          setSyncState('synced', 'Synced', `Clock offset: ${Math.round(msg.offset)}ms`);
+          sendMsg({ type: 'ready' });
+          break;
+
+        case 'track-loaded':
+          loadTrack(msg.url, msg.filename);
+          break;
+
+        case 'play-at': {
+          ensureAudioCtx();
+          const now = Date.now();
+          const delay = msg.time - now;
+          const seekTo = msg.seekTo || 0;
+
+          if (delay > 0) {
+            // Schedule playback in the future
+            setTimeout(() => startPlayback(seekTo), delay);
+          } else {
+            // Already past the target time, play immediately with offset
+            startPlayback(seekTo + Math.abs(delay) / 1000);
+          }
+          break;
+        }
+
+        case 'pause':
+          pausePlayback();
+          break;
+
+        case 'stop':
+          stopPlayback();
+          break;
+
+        case 'set-volume':
+          volumeSlider.value = msg.volume;
+          if (gainNode) gainNode.gain.value = msg.volume;
+          break;
+
+        case 'client-count':
+          connText.textContent = isHost
+            ? `Host · ${msg.count} device${msg.count > 1 ? 's' : ''}`
+            : `Device #${myClientId} · ${msg.count} connected`;
+          break;
+
+        case 'device-list':
+          renderDeviceList(msg.devices);
+          break;
+      }
+    }
+
+    // ── Sync state UI ────────────────────────────────
+    function setSyncState(state, title, detail) {
+      syncIcon.className = `sync-icon ${state}`;
+      syncIcon.innerHTML = state === 'synced' ? '&#10003;' : state === 'syncing' ? '&#8635;' : '&#10007;';
+      syncTitle.textContent = title;
+      syncDetail.textContent = detail;
+    }
+
+    // ── Load audio track ─────────────────────────────
+    async function loadTrack(url, filename) {
+      ensureAudioCtx();
+      currentTrackUrl = url;
+      trackName.textContent = filename;
+      trackMeta.textContent = 'Loading audio...';
+      playerCard.style.display = '';
+
+      try {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+        trackMeta.textContent = `${formatTime(audioBuffer.duration)} · ${audioBuffer.numberOfChannels}ch · ${audioBuffer.sampleRate}Hz`;
+        timeTotal.textContent = formatTime(audioBuffer.duration);
+        progressFill.style.width = '0%';
+        timeCurrent.textContent = '0:00';
+
+        showToast(`Loaded: ${filename}`);
+        sendMsg({ type: 'ready' });
+      } catch (err) {
+        trackMeta.textContent = 'Failed to load audio';
+        console.error('Audio load error:', err);
+      }
+
+      loadTrackList();
+    }
+
+    // ── Playback ─────────────────────────────────────
+    function startPlayback(seekTo = 0) {
+      if (!audioBuffer) return;
+      ensureAudioCtx();
+
+      // Stop existing source
+      if (sourceNode) {
+        try { sourceNode.stop(); } catch {}
+      }
+
+      sourceNode = audioCtx.createBufferSource();
+      sourceNode.buffer = audioBuffer;
+      sourceNode.connect(gainNode);
+
+      const offset = Math.min(seekTo, audioBuffer.duration);
+      sourceNode.start(0, offset);
+      isPlaying = true;
+      playStartLocalTime = Date.now();
+      playStartOffset = offset;
+
+      btnPlay.innerHTML = '&#10074;&#10074;';
+      trackMeta.textContent = 'Playing synced';
+      startProgressUpdate();
+
+      sourceNode.onended = () => {
+        if (isPlaying) {
+          isPlaying = false;
+          btnPlay.innerHTML = '&#9654;';
+          progressFill.style.width = '100%';
+          cancelAnimationFrame(progressRAF);
+        }
+      };
+    }
+
+    function pausePlayback() {
+      if (sourceNode && isPlaying) {
+        try { sourceNode.stop(); } catch {}
+        isPlaying = false;
+        btnPlay.innerHTML = '&#9654;';
+        cancelAnimationFrame(progressRAF);
+      }
+    }
+
+    function stopPlayback() {
+      if (sourceNode) {
+        try { sourceNode.stop(); } catch {}
+      }
+      isPlaying = false;
+      playStartOffset = 0;
+      btnPlay.innerHTML = '&#9654;';
+      progressFill.style.width = '0%';
+      timeCurrent.textContent = '0:00';
+      trackMeta.textContent = 'Stopped';
+      cancelAnimationFrame(progressRAF);
+    }
+
+    function getCurrentTime() {
+      if (!isPlaying) return playStartOffset;
+      return playStartOffset + (Date.now() - playStartLocalTime) / 1000;
+    }
+
+    function startProgressUpdate() {
+      function update() {
+        if (!isPlaying || !audioBuffer) return;
+        const t = getCurrentTime();
+        const pct = Math.min(t / audioBuffer.duration * 100, 100);
+        progressFill.style.width = pct + '%';
+        timeCurrent.textContent = formatTime(t);
+        progressRAF = requestAnimationFrame(update);
+      }
+      update();
+    }
+
+    // ── Track list ───────────────────────────────────
+    async function loadTrackList() {
+      try {
+        const res = await fetch('/tracks');
+        const tracks = await res.json();
+        if (tracks.length === 0) {
+          tracksCard.style.display = 'none';
+          return;
+        }
+        tracksCard.style.display = '';
+        tracksList.innerHTML = tracks.map(t => `
+          <div class="track-item ${t.url === currentTrackUrl ? 'active' : ''}"
+               onclick="selectTrack('${t.url}', '${t.filename.replace(/'/g, "\\'")}')">
+            <span class="icon">&#9835;</span>
+            <span class="name">${t.filename}</span>
+          </div>
+        `).join('');
+      } catch {}
+    }
+
+    function selectTrack(url, filename) {
+      sendMsg({ type: 'select-track', url, filename });
+    }
+
+    // ── Device list ──────────────────────────────────
+    function renderDeviceList(devices) {
+      if (!devices || devices.length === 0) {
+        deviceList.innerHTML = '<div class="empty-state">Waiting for devices...</div>';
+        return;
+      }
+      deviceList.innerHTML = devices.map(d => `
+        <div class="device-item">
+          <div class="device-icon">${d.isHost ? '&#9733;' : '&#128266;'}</div>
+          <div class="device-details">
+            <div class="device-name">${d.name} ${d.id === myClientId ? '(You)' : ''}</div>
+            <div class="device-status">Offset: ${d.offset}ms · ${d.ready ? 'Ready' : 'Syncing...'}</div>
+          </div>
+          ${d.isHost ? '<span class="host-badge">HOST</span>' : ''}
+        </div>
+      `).join('');
+    }
+
+    // ── Event handlers ───────────────────────────────
+
+    // Upload
+    uploadArea.addEventListener('click', () => {
+      ensureAudioCtx();
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) uploadFile(e.target.files[0]);
+    });
+
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+    });
+
+    async function uploadFile(file) {
+      const form = new FormData();
+      form.append('audio', file);
+      trackMeta.textContent = 'Uploading...';
+
+      try {
+        const res = await fetch('/upload', { method: 'POST', body: form });
+        const data = await res.json();
+        if (!data.success) showToast('Upload failed');
+      } catch (err) {
+        showToast('Upload failed');
+      }
+    }
+
+    // Play/Pause
+    btnPlay.addEventListener('click', () => {
+      ensureAudioCtx();
+      if (!audioBuffer) return showToast('Load a track first');
+
+      if (isPlaying) {
+        sendMsg({ type: 'pause' });
+      } else {
+        sendMsg({ type: 'play', seekTo: 0 });
+      }
+    });
+
+    // Stop
+    btnStop.addEventListener('click', () => {
+      sendMsg({ type: 'stop' });
+    });
+
+    // Re-sync
+    btnResync.addEventListener('click', () => {
+      sendMsg({ type: 'resync' });
+      showToast('Re-syncing all devices...');
+    });
+
+    // Volume
+    volumeSlider.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      if (gainNode) gainNode.gain.value = v;
+      sendMsg({ type: 'set-volume', volume: v });
+    });
+
+    // Seek (click on progress bar)
+    progressBg.addEventListener('click', (e) => {
+      if (!audioBuffer) return;
+      const rect = progressBg.getBoundingClientRect();
+      const pct = (e.clientX - rect.left) / rect.width;
+      const seekTo = pct * audioBuffer.duration;
+      sendMsg({ type: 'play', seekTo });
+    });
+
+    // ── Helpers ──────────────────────────────────────
+    function formatTime(sec) {
+      if (!sec || isNaN(sec)) return '0:00';
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    // ── Init ─────────────────────────────────────────
+    connect();
+    loadTrackList();
+
+    // Activate audio context on first user interaction (mobile requirement)
+    document.addEventListener('click', () => ensureAudioCtx(), { once: true });
+    document.addEventListener('touchstart', () => ensureAudioCtx(), { once: true });
+  </script>
+</body>
+</html>

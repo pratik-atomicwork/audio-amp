@@ -1,0 +1,5 @@
+node_modules/
+public/audio/*
+!public/audio/.gitkeep
+.env
+.DS_Store
