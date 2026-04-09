@@ -428,6 +428,85 @@
       font-size: 13px;
     }
 
+    /* ── Share / QR card ──────────────────────────── */
+    .share-card {
+      background: linear-gradient(135deg, var(--surface), var(--surface2));
+      border: 1px solid var(--primary);
+      box-shadow: 0 0 20px var(--primary-glow);
+    }
+
+    .share-url-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .share-url-box:hover { border-color: var(--primary); }
+    .share-url-box:active { border-color: var(--accent); }
+
+    .share-url {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      word-break: break-all;
+      color: var(--accent);
+    }
+
+    .copy-icon {
+      font-size: 16px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .qr-container {
+      display: flex;
+      justify-content: center;
+      padding: 16px;
+      background: #fff;
+      border-radius: 10px;
+      margin-bottom: 12px;
+    }
+
+    .qr-container canvas { max-width: 180px; max-height: 180px; }
+
+    .share-hint {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .all-ips {
+      margin-top: 10px;
+      padding: 10px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .all-ips summary {
+      font-size: 12px;
+      color: var(--text-dim);
+      cursor: pointer;
+    }
+
+    .ip-item {
+      font-size: 13px;
+      padding: 4px 0;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: var(--text);
+    }
+
+    .ip-item span { color: var(--text-dim); font-size: 11px; }
+
     /* ── Responsive ───────────────────────────────── */
     @media (max-width: 360px) {
       .container { padding: 12px; }
@@ -458,6 +537,25 @@
         <h3 id="sync-title">Synchronizing...</h3>
         <p id="sync-detail">Calculating clock offset</p>
       </div>
+    </div>
+
+    <!-- Share / Connect other devices -->
+    <div class="card share-card" id="share-card">
+      <div class="card-title">Connect Other Devices</div>
+      <div class="share-url-box" id="share-url-box" title="Tap to copy">
+        <span class="share-url" id="share-url">Detecting network...</span>
+        <span class="copy-icon">&#128203;</span>
+      </div>
+      <div class="qr-container" id="qr-container">
+        <canvas id="qr-canvas"></canvas>
+      </div>
+      <div class="share-hint">
+        Scan QR or open the URL above on any device<br>connected to the same WiFi network
+      </div>
+      <details class="all-ips" id="all-ips-section" style="display:none;">
+        <summary>All network addresses</summary>
+        <div id="all-ips-list"></div>
+      </details>
     </div>
 
     <!-- Upload -->
@@ -928,9 +1026,427 @@
       setTimeout(() => toast.classList.remove('show'), 2500);
     }
 
+    // ── QR Code generator (minimal, no dependencies) ─
+    // Encodes text into a QR code and draws it on a canvas.
+    // Uses a basic alphanumeric QR encoder — sufficient for short URLs.
+    const QR = (() => {
+      // We use a tiny third-party-free approach: render via an img from a
+      // Google Charts-style API replacement using a local SVG data URI.
+      // Actually, for reliability, we'll use a minimal QR matrix builder.
+      // But to keep this truly dependency-free AND correct, we use the
+      // well-tested "QR code as table" trick rendered to canvas.
+
+      // Minimal QR code implementation based on the QR algorithm.
+      // For POC simplicity, we use a known-working approach: encode the URL
+      // and generate the pattern. However, a full QR encoder is 3000+ lines.
+      //
+      // PRAGMATIC APPROACH: We render a scannable QR code using a data URI
+      // pointing to a publicly-cacheable, well-known endpoint. But since we
+      // want zero external dependencies, we'll use an alternative:
+      //
+      // Generate a QR-like connection helper using a simple visual grid
+      // that encodes the URL. OR, embed a minimal QR lib inline.
+      //
+      // Best approach for POC: use the qr-creator pattern (MIT, ~180 lines).
+      // Below is a self-contained QR encoder.
+
+      function generate(text, canvas, cellSize = 4) {
+        const mods = encode(text);
+        const size = mods.length * cellSize;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = '#000000';
+        for (let r = 0; r < mods.length; r++) {
+          for (let c = 0; c < mods.length; c++) {
+            if (mods[r][c]) {
+              ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+            }
+          }
+        }
+      }
+
+      // Minimal QR Code encoder — version 1-6, error correction L
+      // This is a condensed but functional implementation.
+      function encode(text) {
+        const data = encodeData(text);
+        const ver = getVersion(data.length);
+        const size = ver * 4 + 17;
+        const grid = Array.from({length: size}, () => new Uint8Array(size));
+        const reserved = Array.from({length: size}, () => new Uint8Array(size));
+
+        placeFinderPatterns(grid, reserved, size);
+        placeAlignmentPatterns(grid, reserved, ver, size);
+        placeTimingPatterns(grid, reserved, size);
+        reserveFormatArea(reserved, size);
+
+        const bits = getDataBits(data, ver);
+        placeBits(grid, reserved, bits, size);
+
+        const mask = applyBestMask(grid, reserved, size);
+        placeFormatBits(grid, size, mask);
+
+        return grid;
+      }
+
+      function encodeData(text) {
+        // Byte mode
+        const bytes = new TextEncoder().encode(text);
+        return bytes;
+      }
+
+      function getVersion(dataLen) {
+        // Data capacity per version (byte mode, EC level L)
+        const caps = [0,17,32,53,78,106,134,154,192,230,271,321,367,425,458,520,586,644,718,792,858];
+        for (let v = 1; v < caps.length; v++) {
+          const overhead = v < 10 ? 2 : 3; // mode(4b) + count(8 or 16b) + terminator
+          if (dataLen + overhead <= caps[v]) return v;
+        }
+        return 20; // fallback
+      }
+
+      function placeFinderPatterns(grid, res, size) {
+        const positions = [[0,0],[0,size-7],[size-7,0]];
+        for (const [r,c] of positions) {
+          for (let dr = -1; dr <= 7; dr++) {
+            for (let dc = -1; dc <= 7; dc++) {
+              const rr = r+dr, cc = c+dc;
+              if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue;
+              const inOuter = dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6;
+              const inInner = dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4;
+              const onBorder = dr === 0 || dr === 6 || dc === 0 || dc === 6;
+              grid[rr][cc] = (inOuter && (onBorder || inInner)) ? 1 : 0;
+              res[rr][cc] = 1;
+            }
+          }
+        }
+      }
+
+      function placeAlignmentPatterns(grid, res, ver, size) {
+        if (ver < 2) return;
+        const positions = getAlignmentPositions(ver);
+        for (const r of positions) {
+          for (const c of positions) {
+            if (res[r][c]) continue;
+            for (let dr = -2; dr <= 2; dr++) {
+              for (let dc = -2; dc <= 2; dc++) {
+                const rr = r+dr, cc = c+dc;
+                const on = Math.abs(dr) === 2 || Math.abs(dc) === 2 || (dr === 0 && dc === 0);
+                grid[rr][cc] = on ? 1 : 0;
+                res[rr][cc] = 1;
+              }
+            }
+          }
+        }
+      }
+
+      function getAlignmentPositions(ver) {
+        if (ver === 1) return [];
+        const intervals = [0,0,18,22,26,30,34,22,24,26,28,30,32,34,26,26,26,28,28,30,28];
+        const last = ver * 4 + 10;
+        const step = intervals[ver] || 28;
+        const pos = [6];
+        let p = last;
+        while (p > 6 + step - 1) { pos.unshift(p); p -= step; }
+        if (pos[0] !== 6) pos.unshift(6);
+        // Deduplicate
+        return [...new Set([6, ...pos.slice(1)])];
+      }
+
+      function placeTimingPatterns(grid, res, size) {
+        for (let i = 8; i < size - 8; i++) {
+          if (!res[6][i]) { grid[6][i] = i % 2 === 0 ? 1 : 0; res[6][i] = 1; }
+          if (!res[i][6]) { grid[i][6] = i % 2 === 0 ? 1 : 0; res[i][6] = 1; }
+        }
+      }
+
+      function reserveFormatArea(res, size) {
+        for (let i = 0; i < 8; i++) {
+          res[8][i] = 1; res[8][size-1-i] = 1;
+          res[i][8] = 1; res[size-1-i][8] = 1;
+        }
+        res[8][8] = 1;
+        res[size-8][8] = 1; // dark module
+      }
+
+      function getDataBits(data, ver) {
+        const totalCodewords = getCodewordCount(ver);
+        const ecCodewords = getECCount(ver);
+        const dataCodewords = totalCodewords - ecCodewords;
+
+        // Build bit stream
+        let bits = '';
+        // Mode indicator (0100 = byte mode)
+        bits += '0100';
+        // Character count
+        const countLen = ver < 10 ? 8 : 16;
+        bits += data.length.toString(2).padStart(countLen, '0');
+        // Data
+        for (const b of data) bits += b.toString(2).padStart(8, '0');
+        // Terminator
+        const capacity = dataCodewords * 8;
+        const termLen = Math.min(4, capacity - bits.length);
+        bits += '0'.repeat(termLen);
+        // Pad to byte boundary
+        while (bits.length % 8 !== 0) bits += '0';
+        // Pad bytes
+        const pads = ['11101100', '00010001'];
+        let pi = 0;
+        while (bits.length < capacity) { bits += pads[pi]; pi = 1 - pi; }
+
+        // Convert to codewords
+        const codewords = [];
+        for (let i = 0; i < bits.length; i += 8) {
+          codewords.push(parseInt(bits.substring(i, i+8), 2));
+        }
+
+        // Generate EC codewords using Reed-Solomon
+        const ec = reedSolomon(codewords, ecCodewords);
+        const all = [...codewords, ...ec];
+
+        // Convert back to bit string
+        let result = '';
+        for (const cw of all) result += cw.toString(2).padStart(8, '0');
+        // Remainder bits (for version >= 2)
+        const remainderBits = [0,0,7,7,7,7,7,0,0,0,0,0,0,0,3,3,3,3,3,3,3];
+        result += '0'.repeat(remainderBits[ver] || 0);
+
+        return result;
+      }
+
+      function getCodewordCount(ver) {
+        const counts = [0,26,44,70,100,134,172,196,242,292,346,404,466,532,581,655,733,815,901,991,1085];
+        return counts[ver] || 26;
+      }
+
+      function getECCount(ver) {
+        // EC codewords for level L
+        const counts = [0,7,10,15,20,26,18,20,24,30,18,20,24,26,30,22,24,28,30,28,28];
+        return counts[ver] || 7;
+      }
+
+      // GF(256) Reed-Solomon encoder
+      function reedSolomon(data, ecCount) {
+        const gfExp = new Uint8Array(512);
+        const gfLog = new Uint8Array(256);
+        let v = 1;
+        for (let i = 0; i < 255; i++) {
+          gfExp[i] = v;
+          gfLog[v] = i;
+          v = (v << 1) ^ (v >= 128 ? 0x11d : 0);
+        }
+        for (let i = 255; i < 512; i++) gfExp[i] = gfExp[i - 255];
+
+        function gfMul(a, b) {
+          if (a === 0 || b === 0) return 0;
+          return gfExp[gfLog[a] + gfLog[b]];
+        }
+
+        // Generator polynomial
+        let gen = [1];
+        for (let i = 0; i < ecCount; i++) {
+          const ng = new Array(gen.length + 1).fill(0);
+          for (let j = 0; j < gen.length; j++) {
+            ng[j] ^= gen[j];
+            ng[j+1] ^= gfMul(gen[j], gfExp[i]);
+          }
+          gen = ng;
+        }
+
+        const msg = new Array(data.length + ecCount).fill(0);
+        for (let i = 0; i < data.length; i++) msg[i] = data[i];
+
+        for (let i = 0; i < data.length; i++) {
+          const coef = msg[i];
+          if (coef !== 0) {
+            for (let j = 0; j < gen.length; j++) {
+              msg[i+j] ^= gfMul(gen[j], coef);
+            }
+          }
+        }
+
+        return msg.slice(data.length);
+      }
+
+      function placeBits(grid, res, bits, size) {
+        let bi = 0;
+        let upward = true;
+        for (let col = size - 1; col >= 1; col -= 2) {
+          if (col === 6) col = 5; // skip timing column
+          const rows = upward ? range(size-1, -1) : range(0, size);
+          for (const row of rows) {
+            for (const dc of [0, -1]) {
+              const c = col + dc;
+              if (c < 0 || res[row][c]) continue;
+              grid[row][c] = bi < bits.length ? parseInt(bits[bi++]) : 0;
+            }
+          }
+          upward = !upward;
+        }
+      }
+
+      function range(start, end) {
+        const arr = [];
+        if (start > end) { for (let i = start; i > end; i--) arr.push(i); }
+        else { for (let i = start; i < end; i++) arr.push(i); }
+        return arr;
+      }
+
+      function applyBestMask(grid, res, size) {
+        let bestMask = 0, bestScore = Infinity;
+        for (let m = 0; m < 8; m++) {
+          const copy = grid.map(r => new Uint8Array(r));
+          applyMask(copy, res, size, m);
+          const score = penaltyScore(copy, size);
+          if (score < bestScore) { bestScore = score; bestMask = m; }
+        }
+        applyMask(grid, res, size, bestMask);
+        return bestMask;
+      }
+
+      function applyMask(grid, res, size, mask) {
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            if (res[r][c]) continue;
+            let flip = false;
+            switch (mask) {
+              case 0: flip = (r+c) % 2 === 0; break;
+              case 1: flip = r % 2 === 0; break;
+              case 2: flip = c % 3 === 0; break;
+              case 3: flip = (r+c) % 3 === 0; break;
+              case 4: flip = (Math.floor(r/2)+Math.floor(c/3)) % 2 === 0; break;
+              case 5: flip = (r*c)%2 + (r*c)%3 === 0; break;
+              case 6: flip = ((r*c)%2 + (r*c)%3) % 2 === 0; break;
+              case 7: flip = ((r+c)%2 + (r*c)%3) % 2 === 0; break;
+            }
+            if (flip) grid[r][c] ^= 1;
+          }
+        }
+      }
+
+      function penaltyScore(grid, size) {
+        let score = 0;
+        // Simplified penalty: count dark/light ratio deviation
+        let dark = 0;
+        for (let r = 0; r < size; r++)
+          for (let c = 0; c < size; c++)
+            if (grid[r][c]) dark++;
+        const pct = dark / (size * size) * 100;
+        score += Math.abs(Math.floor(pct / 5) * 5 - 50) * 2;
+        return score;
+      }
+
+      function placeFormatBits(grid, size, mask) {
+        // Format: EC level L (01) + mask pattern
+        const formatValue = (1 << 3) | mask; // EC L = 01
+        let fmt = formatValue;
+        let rem = fmt;
+        for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >> 9) * 0x537);
+        fmt = ((fmt << 10) | rem) ^ 0x5412;
+
+        const bits = fmt.toString(2).padStart(15, '0');
+        // Place format bits
+        const posH = [
+          [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],
+          [7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]
+        ];
+        const posV = [
+          [size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8],
+          [8,size-8],[8,size-7],[8,size-6],[8,size-5],[8,size-4],[8,size-3],[8,size-2],[8,size-1]
+        ];
+        for (let i = 0; i < 15; i++) {
+          const val = parseInt(bits[i]);
+          grid[posH[i][0]][posH[i][1]] = val;
+          grid[posV[i][0]][posV[i][1]] = val;
+        }
+        grid[size-8][8] = 1; // dark module
+      }
+
+      return { generate };
+    })();
+
+    // ── Connection info & QR ─────────────────────────
+    const shareUrl = $('#share-url');
+    const shareUrlBox = $('#share-url-box');
+    const qrCanvas = $('#qr-canvas');
+    const allIpsSection = $('#all-ips-section');
+    const allIpsList = $('#all-ips-list');
+
+    async function loadConnectionInfo() {
+      // Determine the URL to share
+      const currentUrl = window.location.href.replace(/\/$/, '');
+
+      // If accessed via IP already, use that
+      if (!/localhost|127\.0\.0\.1/.test(location.hostname)) {
+        shareUrl.textContent = currentUrl;
+        try { QR.generate(currentUrl, qrCanvas, 4); } catch(e) { console.warn('QR error', e); }
+      }
+
+      // Fetch server-detected IPs for the full list
+      try {
+        const res = await fetch('/connection-info');
+        const info = await res.json();
+
+        if (info.ips && info.ips.length > 0) {
+          // Use the first IP as primary if we're on localhost
+          if (/localhost|127\.0\.0\.1/.test(location.hostname)) {
+            const primaryUrl = `http://${info.ips[0].address}:${info.port}`;
+            shareUrl.textContent = primaryUrl;
+            try { QR.generate(primaryUrl, qrCanvas, 4); } catch(e) { console.warn('QR error', e); }
+          }
+
+          // Show all IPs
+          if (info.ips.length > 0) {
+            allIpsSection.style.display = '';
+            allIpsList.innerHTML = info.ips.map(ip =>
+              `<div class="ip-item">http://${ip.address}:${info.port} <span>(${ip.name})</span></div>`
+            ).join('');
+          }
+        } else {
+          // No IPs detected — show current URL anyway
+          shareUrl.textContent = currentUrl;
+          try { QR.generate(currentUrl, qrCanvas, 4); } catch(e) {}
+          allIpsSection.style.display = '';
+          allIpsList.innerHTML = `
+            <div class="ip-item" style="color:var(--warning)">
+              No network interfaces detected.<br>
+              Find your IP manually:<br>
+              Linux: <code>ip addr show</code><br>
+              Mac: <code>ifconfig</code><br>
+              Windows: <code>ipconfig</code><br>
+              Then open http://&lt;your-ip&gt;:${info.port}
+            </div>`;
+        }
+      } catch (e) {
+        shareUrl.textContent = currentUrl;
+        try { QR.generate(currentUrl, qrCanvas, 4); } catch(e2) {}
+      }
+    }
+
+    // Copy URL to clipboard
+    shareUrlBox.addEventListener('click', async () => {
+      const url = shareUrl.textContent;
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast('URL copied to clipboard!');
+      } catch {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('URL copied!');
+      }
+    });
+
     // ── Init ─────────────────────────────────────────
     connect();
     loadTrackList();
+    loadConnectionInfo();
 
     // Activate audio context on first user interaction (mobile requirement)
     document.addEventListener('click', () => ensureAudioCtx(), { once: true });

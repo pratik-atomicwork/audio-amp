@@ -42,6 +42,13 @@ let isPlaying = false;
 let hostWs = null; // first connected client becomes host
 let nextClientId = 1;
 
+// ── CORS — must be before routes ──────────────────────────────────────
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', '*');
+  next();
+});
+
 // ── Express routes ─────────────────────────────────────────────────────
 app.use(express.static('public'));
 app.use('/audio', express.static(AUDIO_DIR));
@@ -70,6 +77,17 @@ app.get('/status', (req, res) => {
     isPlaying
   });
 });
+
+// Health check — useful for debugging connectivity from other devices
+app.get('/health', (req, res) => {
+  res.json({ ok: true, time: Date.now(), clients: clients.size });
+});
+
+// Return server connection info (IPs) so the UI can show them
+app.get('/connection-info', (req, res) => {
+  res.json({ ips: getAllLocalIPs(), port: PORT });
+});
+
 
 // ── WebSocket handling ─────────────────────────────────────────────────
 wss.on('connection', (ws, req) => {
@@ -260,31 +278,51 @@ function broadcastDeviceList() {
   broadcast({ type: 'device-list', devices });
 }
 
-// ── Get local IP ───────────────────────────────────────────────────────
-function getLocalIP() {
+// ── Get ALL local IPs ──────────────────────────────────────────────────
+function getAllLocalIPs() {
+  const ips = [];
   const nets = os.networkInterfaces();
   for (const name of Object.keys(nets)) {
     for (const net of nets[name]) {
+      // Include IPv4, non-internal addresses
       if (net.family === 'IPv4' && !net.internal) {
-        return net.address;
+        ips.push({ name, address: net.address });
       }
     }
   }
-  return 'localhost';
+  return ips;
 }
 
 // ── Start server ───────────────────────────────────────────────────────
 server.listen(PORT, '0.0.0.0', () => {
-  const ip = getLocalIP();
+  const ips = getAllLocalIPs();
   console.log('');
-  console.log('  ╔══════════════════════════════════════════════╗');
-  console.log('  ║         🔊  AUDIO AMP - Multi-Device Sync   ║');
-  console.log('  ╠══════════════════════════════════════════════╣');
-  console.log(`  ║  Local:   http://localhost:${PORT}             ║`);
-  console.log(`  ║  Network: http://${ip}:${PORT}       ║`);
-  console.log('  ╠══════════════════════════════════════════════╣');
-  console.log('  ║  Open this URL on all devices on the same   ║');
-  console.log('  ║  WiFi network to sync audio playback!       ║');
-  console.log('  ╚══════════════════════════════════════════════╝');
+  console.log('  ╔══════════════════════════════════════════════════════╗');
+  console.log('  ║           🔊  AUDIO AMP - Multi-Device Sync        ║');
+  console.log('  ╠══════════════════════════════════════════════════════╣');
+  console.log(`  ║  Local:     http://localhost:${PORT}                  ║`);
+  if (ips.length > 0) {
+    for (const ip of ips) {
+      const url = `http://${ip.address}:${PORT}`;
+      const pad = ' '.repeat(Math.max(0, 38 - url.length - ip.name.length));
+      console.log(`  ║  ${ip.name}: ${url}${pad}║`);
+    }
+  } else {
+    console.log('  ║  ⚠  No network interfaces found!                   ║');
+    console.log('  ║  Try: connect to WiFi, then restart                 ║');
+  }
+  console.log('  ╠══════════════════════════════════════════════════════╣');
+  console.log('  ║  Open the Network URL on all devices on the same    ║');
+  console.log('  ║  WiFi. Or scan the QR code shown on the web page.   ║');
+  console.log('  ╚══════════════════════════════════════════════════════╝');
   console.log('');
+
+  if (ips.length === 0) {
+    console.log('  TROUBLESHOOTING:');
+    console.log('  1. Make sure this machine is connected to WiFi');
+    console.log('  2. Run: ip addr show  (Linux) or ifconfig (Mac)');
+    console.log('  3. Find your local IP (usually 192.168.x.x)');
+    console.log(`  4. Open http://<that-ip>:${PORT} on other devices`);
+    console.log('');
+  }
 });
