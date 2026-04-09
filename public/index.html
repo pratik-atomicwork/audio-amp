@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Audio Amp — Multi-Device Sync</title>
+  <title>AudioAmp</title>
   <style>
     :root {
       --bg: #0a0a0f;
@@ -29,877 +29,554 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      min-height: 100dvh;
       overflow-x: hidden;
     }
 
-    /* ── Header ──────────────────────────────────── */
     .header {
-      padding: 20px 24px;
+      padding: 16px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       border-bottom: 1px solid var(--border);
       background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
 
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-    }
-
+    .logo { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
     .logo-icon {
-      width: 36px;
-      height: 36px;
+      width: 32px; height: 32px;
       background: linear-gradient(135deg, var(--primary), var(--accent));
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
     }
 
-    .connection-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 500;
-      background: var(--surface2);
-      border: 1px solid var(--border);
+    .conn-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+      background: var(--surface2); border: 1px solid var(--border);
     }
-
-    .connection-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--success);
-      animation: pulse 2s infinite;
+    .conn-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--danger);
+      transition: background 0.3s;
     }
+    .conn-dot.ok { background: var(--success); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
 
-    .connection-dot.disconnected {
-      background: var(--danger);
-      animation: none;
-    }
+    .container { max-width: 480px; margin: 0 auto; padding: 16px; }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-
-    /* ── Main Layout ─────────────────────────────── */
-    .container {
-      max-width: 480px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-
-    /* ── Cards ────────────────────────────────────── */
     .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px; margin-bottom: 14px;
     }
-
     .card-title {
-      font-size: 13px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--text-dim);
-      margin-bottom: 14px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--text-dim); margin-bottom: 12px;
     }
 
-    /* ── Sync Status ─────────────────────────────── */
-    .sync-status {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 14px 16px;
-      border-radius: var(--radius);
-      background: var(--surface2);
-      margin-bottom: 16px;
-      border: 1px solid var(--border);
+    /* ── Sync ─────────────────────── */
+    .sync-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; border-radius: var(--radius);
+      background: var(--surface2); margin-bottom: 14px; border: 1px solid var(--border);
     }
-
-    .sync-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      flex-shrink: 0;
+    .sync-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+      background: var(--warning); transition: background 0.3s;
     }
+    .sync-dot.synced { background: var(--success); }
+    .sync-dot.error { background: var(--danger); }
+    .sync-label { font-size: 13px; }
+    .sync-label small { color: var(--text-dim); font-size: 11px; }
 
-    .sync-icon.synced { background: rgba(0, 184, 148, 0.15); }
-    .sync-icon.syncing { background: rgba(253, 203, 110, 0.15); animation: spin 1s linear infinite; }
-    .sync-icon.error { background: rgba(225, 112, 85, 0.15); }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    /* ── Share ────────────────────── */
+    .share-card { border-color: var(--primary); box-shadow: 0 0 15px var(--primary-glow); }
+    .share-url-box {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 14px; cursor: pointer; transition: border-color 0.15s; margin-bottom: 12px;
     }
+    .share-url-box:hover { border-color: var(--primary); }
+    .share-url {
+      flex: 1; font-size: 13px; font-weight: 600;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      word-break: break-all; color: var(--accent);
+    }
+    .copy-icon { font-size: 16px; color: var(--text-dim); flex-shrink: 0; cursor: pointer; }
 
-    .sync-info h3 { font-size: 15px; font-weight: 600; }
-    .sync-info p { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+    .qr-wrap {
+      display: flex; justify-content: center; padding: 12px;
+      background: #fff; border-radius: 10px; margin-bottom: 10px;
+    }
+    .qr-wrap img { max-width: 180px; max-height: 180px; image-rendering: pixelated; }
+    .share-hint { font-size: 11px; color: var(--text-dim); text-align: center; line-height: 1.5; }
 
-    /* ── Upload Area ─────────────────────────────── */
+    .ip-list { margin-top: 10px; }
+    .ip-list summary { font-size: 11px; color: var(--text-dim); cursor: pointer; }
+    .ip-item {
+      font-size: 12px; padding: 3px 0;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; color: var(--text);
+    }
+    .ip-item span { color: var(--text-dim); font-size: 10px; }
+
+    /* ── Upload ───────────────────── */
     .upload-area {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 32px 20px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
+      border: 2px dashed var(--border); border-radius: var(--radius);
+      padding: 28px 16px; text-align: center; cursor: pointer; transition: all 0.2s;
     }
-
     .upload-area:hover, .upload-area.dragover {
-      border-color: var(--primary);
-      background: var(--primary-glow);
+      border-color: var(--primary); background: var(--primary-glow);
     }
-
-    .upload-area .icon { font-size: 32px; margin-bottom: 8px; }
-    .upload-area p { color: var(--text-dim); font-size: 14px; }
-    .upload-area .formats { font-size: 11px; color: var(--text-dim); margin-top: 6px; opacity: 0.6; }
-
+    .upload-area .icon { font-size: 28px; margin-bottom: 6px; }
+    .upload-area p { color: var(--text-dim); font-size: 13px; }
+    .upload-area .formats { font-size: 10px; color: var(--text-dim); margin-top: 4px; opacity: 0.6; }
     #file-input { display: none; }
 
-    /* ── Track Info ───────────────────────────────── */
-    .track-info {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 14px 0;
-    }
-
+    /* ── Player ───────────────────── */
+    .track-info { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
     .track-art {
-      width: 56px;
-      height: 56px;
-      border-radius: 10px;
+      width: 50px; height: 50px; border-radius: 10px;
       background: linear-gradient(135deg, var(--primary), var(--accent));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
     }
-
     .track-details { flex: 1; min-width: 0; }
     .track-name {
-      font-size: 16px;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 15px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .track-meta { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+    .track-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
 
-    /* ── Waveform / Progress ─────────────────────── */
-    .progress-container {
-      margin: 16px 0;
+    .progress-wrap { margin: 12px 0; }
+    .progress-bg {
+      width: 100%; height: 6px; background: var(--surface2);
+      border-radius: 3px; cursor: pointer; position: relative; overflow: hidden;
     }
-
-    .progress-bar-bg {
-      width: 100%;
-      height: 6px;
-      background: var(--surface2);
-      border-radius: 3px;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
+    .progress-fill {
+      height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent));
+      border-radius: 3px; width: 0%; transition: width 0.15s linear;
     }
-
-    .progress-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--primary), var(--accent));
-      border-radius: 3px;
-      width: 0%;
-      transition: width 0.1s linear;
-    }
-
-    .time-display {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      color: var(--text-dim);
-      margin-top: 6px;
+    .time-row {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: var(--text-dim); margin-top: 5px;
       font-variant-numeric: tabular-nums;
     }
 
-    /* ── Controls ─────────────────────────────────── */
-    .controls {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      padding: 8px 0;
-    }
-
+    .controls { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 6px 0; }
     .ctrl-btn {
-      background: none;
-      border: none;
-      color: var(--text);
-      cursor: pointer;
-      font-size: 22px;
-      width: 48px;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      transition: all 0.15s;
+      background: none; border: none; color: var(--text); cursor: pointer;
+      font-size: 20px; width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; transition: all 0.15s;
     }
-
     .ctrl-btn:hover { background: var(--surface2); }
     .ctrl-btn:active { transform: scale(0.92); }
-
     .ctrl-btn.play-btn {
-      width: 64px;
-      height: 64px;
-      font-size: 28px;
+      width: 58px; height: 58px; font-size: 26px;
       background: linear-gradient(135deg, var(--primary), #8b5cf6);
-      box-shadow: 0 4px 20px var(--primary-glow);
+      box-shadow: 0 4px 16px var(--primary-glow);
     }
+    .ctrl-btn.play-btn:hover { box-shadow: 0 6px 24px var(--primary-glow); transform: scale(1.05); }
 
-    .ctrl-btn.play-btn:hover {
-      box-shadow: 0 6px 30px var(--primary-glow);
-      transform: scale(1.05);
-    }
-
-    /* ── Volume ───────────────────────────────────── */
-    .volume-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 8px 0;
-    }
-
-    .volume-row .icon { font-size: 18px; }
-
+    .vol-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+    .vol-row .icon { font-size: 16px; }
     input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      flex: 1;
-      height: 6px;
-      background: var(--surface2);
-      border-radius: 3px;
-      outline: none;
+      -webkit-appearance: none; appearance: none;
+      flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; outline: none;
     }
-
     input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 18px;
-      height: 18px;
-      background: var(--primary);
-      border-radius: 50%;
-      cursor: pointer;
-      box-shadow: 0 2px 8px var(--primary-glow);
+      -webkit-appearance: none; width: 16px; height: 16px;
+      background: var(--primary); border-radius: 50%; cursor: pointer;
     }
-
     input[type="range"]::-moz-range-thumb {
-      width: 18px;
-      height: 18px;
-      background: var(--primary);
-      border-radius: 50%;
-      cursor: pointer;
-      border: none;
+      width: 16px; height: 16px; background: var(--primary);
+      border-radius: 50%; cursor: pointer; border: none;
     }
 
-    /* ── Device List ──────────────────────────────── */
+    /* ── Devices ──────────────────── */
     .device-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 14px;
-      background: var(--surface2);
-      border-radius: 10px;
-      margin-bottom: 8px;
-      border: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; background: var(--surface2); border-radius: 10px;
+      margin-bottom: 6px; border: 1px solid var(--border);
     }
-
     .device-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: var(--primary-glow);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
+      width: 32px; height: 32px; border-radius: 50%; background: var(--primary-glow);
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
     }
-
     .device-details { flex: 1; }
-    .device-name { font-size: 14px; font-weight: 500; }
-    .device-status { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-
+    .device-name { font-size: 13px; font-weight: 500; }
+    .device-status { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
     .host-badge {
-      font-size: 10px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 10px;
-      background: var(--accent-glow);
-      color: var(--accent);
-      border: 1px solid var(--accent);
+      font-size: 9px; font-weight: 600; padding: 2px 7px; border-radius: 10px;
+      background: var(--accent-glow); color: var(--accent); border: 1px solid var(--accent);
     }
 
-    /* ── Tracks list ─────────────────────────────── */
+    /* ── Tracks list ──────────────── */
     .track-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 14px;
-      background: var(--surface2);
-      border-radius: 10px;
-      margin-bottom: 8px;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      transition: all 0.15s;
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; background: var(--surface2); border-radius: 10px;
+      margin-bottom: 6px; cursor: pointer;
+      border: 1px solid var(--border); transition: all 0.15s;
     }
-
-    .track-item:hover {
-      border-color: var(--primary);
-      background: var(--primary-glow);
-    }
-
-    .track-item.active {
-      border-color: var(--primary);
-    }
-
-    .track-item .icon { font-size: 20px; }
+    .track-item:hover { border-color: var(--primary); background: var(--primary-glow); }
+    .track-item.active { border-color: var(--primary); }
+    .track-item .icon { font-size: 18px; }
     .track-item .name {
-      flex: 1;
-      font-size: 14px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    /* ── Resync button ───────────────────────────── */
+    /* ── Diagnostics ──────────────── */
+    .diag-log {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 11px; color: var(--text-dim);
+      max-height: 180px; overflow-y: auto; line-height: 1.6;
+    }
     .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 10px 20px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--surface2);
-      color: var(--text);
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.15s;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+      font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s;
     }
-
     .btn:hover { border-color: var(--primary); background: var(--primary-glow); }
     .btn-full { width: 100%; justify-content: center; }
 
-    /* ── Toast ────────────────────────────────────── */
     .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
+      position: fixed; bottom: 20px; left: 50%;
       transform: translateX(-50%) translateY(80px);
-      padding: 12px 24px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      font-size: 13px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-      transition: transform 0.3s ease;
-      z-index: 100;
-      white-space: nowrap;
+      padding: 10px 20px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      transition: transform 0.3s ease; z-index: 100; white-space: nowrap;
     }
-
     .toast.show { transform: translateX(-50%) translateY(0); }
 
-    /* ── Empty state ─────────────────────────────── */
-    .empty-state {
-      text-align: center;
-      padding: 20px;
-      color: var(--text-dim);
-      font-size: 13px;
-    }
+    .empty { text-align: center; padding: 16px; color: var(--text-dim); font-size: 12px; }
 
-    /* ── Share / QR card ──────────────────────────── */
-    .share-card {
-      background: linear-gradient(135deg, var(--surface), var(--surface2));
-      border: 1px solid var(--primary);
-      box-shadow: 0 0 20px var(--primary-glow);
-    }
-
-    .share-url-box {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 14px;
-      margin-bottom: 12px;
-      cursor: pointer;
-      transition: border-color 0.15s;
-    }
-
-    .share-url-box:hover { border-color: var(--primary); }
-    .share-url-box:active { border-color: var(--accent); }
-
-    .share-url {
-      flex: 1;
-      font-size: 14px;
-      font-weight: 600;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      word-break: break-all;
-      color: var(--accent);
-    }
-
-    .copy-icon {
-      font-size: 16px;
-      color: var(--text-dim);
-      flex-shrink: 0;
-    }
-
-    .qr-container {
-      display: flex;
-      justify-content: center;
-      padding: 16px;
-      background: #fff;
-      border-radius: 10px;
-      margin-bottom: 12px;
-    }
-
-    .qr-container canvas { max-width: 180px; max-height: 180px; }
-
-    .share-hint {
-      font-size: 12px;
-      color: var(--text-dim);
-      text-align: center;
-      line-height: 1.5;
-    }
-
-    .all-ips {
-      margin-top: 10px;
-      padding: 10px 14px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-    }
-
-    .all-ips summary {
-      font-size: 12px;
-      color: var(--text-dim);
-      cursor: pointer;
-    }
-
-    .ip-item {
-      font-size: 13px;
-      padding: 4px 0;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      color: var(--text);
-    }
-
-    .ip-item span { color: var(--text-dim); font-size: 11px; }
-
-    /* ── Responsive ───────────────────────────────── */
-    @media (max-width: 360px) {
-      .container { padding: 12px; }
-      .card { padding: 16px; }
-    }
+    @media (max-width: 360px) { .container { padding: 10px; } .card { padding: 14px; } }
   </style>
 </head>
 <body>
-
-  <!-- Header -->
   <div class="header">
     <div class="logo">
       <div class="logo-icon">&#9835;</div>
       <span>AudioAmp</span>
     </div>
-    <div class="connection-badge">
-      <div class="connection-dot" id="conn-dot"></div>
+    <div class="conn-badge">
+      <div class="conn-dot" id="conn-dot"></div>
       <span id="conn-text">Connecting...</span>
     </div>
   </div>
 
   <div class="container">
-
-    <!-- Sync Status -->
-    <div class="sync-status" id="sync-status">
-      <div class="sync-icon syncing" id="sync-icon">&#8635;</div>
-      <div class="sync-info">
-        <h3 id="sync-title">Synchronizing...</h3>
-        <p id="sync-detail">Calculating clock offset</p>
-      </div>
+    <!-- Sync -->
+    <div class="sync-bar" id="sync-bar">
+      <div class="sync-dot" id="sync-dot"></div>
+      <div class="sync-label" id="sync-label">Connecting to server... <small>waiting</small></div>
     </div>
 
-    <!-- Share / Connect other devices -->
+    <!-- Share -->
     <div class="card share-card" id="share-card">
       <div class="card-title">Connect Other Devices</div>
       <div class="share-url-box" id="share-url-box" title="Tap to copy">
-        <span class="share-url" id="share-url">Detecting network...</span>
+        <span class="share-url" id="share-url">Detecting...</span>
         <span class="copy-icon">&#128203;</span>
       </div>
-      <div class="qr-container" id="qr-container">
-        <canvas id="qr-canvas"></canvas>
+      <div class="qr-wrap" id="qr-wrap" style="display:none;">
+        <img id="qr-img" alt="QR Code">
       </div>
-      <div class="share-hint">
-        Scan QR or open the URL above on any device<br>connected to the same WiFi network
-      </div>
-      <details class="all-ips" id="all-ips-section" style="display:none;">
+      <div class="share-hint">Scan QR or open URL on devices on the same WiFi</div>
+      <details class="ip-list" id="ip-details" style="display:none;">
         <summary>All network addresses</summary>
-        <div id="all-ips-list"></div>
+        <div id="ip-list"></div>
       </details>
     </div>
 
     <!-- Upload -->
-    <div class="card" id="upload-card">
+    <div class="card">
       <div class="card-title">Load Audio</div>
       <div class="upload-area" id="upload-area">
         <div class="icon">&#127925;</div>
         <p>Tap to upload or drag audio file</p>
-        <div class="formats">MP3, WAV, OGG, M4A, AAC, FLAC</div>
+        <div class="formats">MP3 &middot; WAV &middot; OGG &middot; M4A &middot; AAC &middot; FLAC</div>
       </div>
       <input type="file" id="file-input" accept="audio/*">
     </div>
 
-    <!-- Saved Tracks -->
+    <!-- Tracks -->
     <div class="card" id="tracks-card" style="display:none;">
       <div class="card-title">Tracks</div>
       <div id="tracks-list"></div>
     </div>
 
-    <!-- Now Playing -->
+    <!-- Player -->
     <div class="card" id="player-card" style="display:none;">
       <div class="card-title">Now Playing</div>
-
       <div class="track-info">
         <div class="track-art">&#9835;</div>
         <div class="track-details">
-          <div class="track-name" id="track-name">—</div>
-          <div class="track-meta" id="track-meta">Ready to play</div>
+          <div class="track-name" id="track-name">&mdash;</div>
+          <div class="track-meta" id="track-meta">Ready</div>
         </div>
       </div>
-
-      <!-- Progress -->
-      <div class="progress-container">
-        <div class="progress-bar-bg" id="progress-bg">
-          <div class="progress-bar-fill" id="progress-fill"></div>
+      <div class="progress-wrap">
+        <div class="progress-bg" id="progress-bg">
+          <div class="progress-fill" id="progress-fill"></div>
         </div>
-        <div class="time-display">
-          <span id="time-current">0:00</span>
+        <div class="time-row">
+          <span id="time-cur">0:00</span>
           <span id="time-total">0:00</span>
         </div>
       </div>
-
-      <!-- Controls -->
       <div class="controls">
         <button class="ctrl-btn" id="btn-stop" title="Stop">&#9632;</button>
         <button class="ctrl-btn play-btn" id="btn-play" title="Play">&#9654;</button>
-        <button class="ctrl-btn" id="btn-resync" title="Re-sync all devices">&#8635;</button>
+        <button class="ctrl-btn" id="btn-resync" title="Re-sync">&#8635;</button>
       </div>
-
-      <!-- Volume -->
-      <div class="volume-row">
+      <div class="vol-row">
         <span class="icon">&#128264;</span>
         <input type="range" id="volume" min="0" max="1" step="0.01" value="1">
         <span class="icon">&#128266;</span>
       </div>
     </div>
 
-    <!-- Connected Devices -->
+    <!-- Devices -->
     <div class="card">
       <div class="card-title">Connected Devices</div>
-      <div id="device-list">
-        <div class="empty-state">Waiting for devices...</div>
-      </div>
+      <div id="device-list"><div class="empty">Waiting for devices...</div></div>
     </div>
 
-    <!-- Connection Diagnostics (shown when having trouble) -->
+    <!-- Diagnostics -->
     <div class="card" id="diag-card" style="display:none;">
       <div class="card-title">Connection Diagnostics</div>
-      <div id="diag-log" style="font-family:monospace;font-size:11px;color:var(--text-dim);max-height:200px;overflow-y:auto;line-height:1.6;"></div>
-      <button class="btn btn-full" onclick="runDiagnostics()" style="margin-top:10px;">Re-run diagnostics</button>
+      <div class="diag-log" id="diag-log"></div>
+      <button class="btn btn-full" onclick="runDiagnostics()" style="margin-top:8px;">Re-run diagnostics</button>
     </div>
-
   </div>
 
   <div class="toast" id="toast"></div>
 
+  <!-- Socket.IO client — served automatically by the Socket.IO server -->
+  <script src="/socket.io/socket.io.js"></script>
   <script>
-    // ── State ────────────────────────────────────────
-    let ws = null;
-    let wsConnectTimer = null;
-    let reconnectDelay = 1000;
+    // ── State ──────────────────────
+    let socket = null;
     let myClientId = null;
     let isHost = false;
-    let clockOffset = 0;
     let audioCtx = null;
     let audioBuffer = null;
     let sourceNode = null;
     let gainNode = null;
     let isPlaying = false;
-    let playStartLocalTime = 0;
+    let playStartTime = 0;
     let playStartOffset = 0;
     let currentTrackUrl = null;
     let progressRAF = null;
 
-    // ── DOM refs ─────────────────────────────────────
-    const $ = (sel) => document.querySelector(sel);
+    // ── DOM ────────────────────────
+    const $ = s => document.querySelector(s);
     const connDot = $('#conn-dot');
     const connText = $('#conn-text');
-    const syncIcon = $('#sync-icon');
-    const syncTitle = $('#sync-title');
-    const syncDetail = $('#sync-detail');
+    const syncDot = $('#sync-dot');
+    const syncLabel = $('#sync-label');
+    const shareUrl = $('#share-url');
+    const shareUrlBox = $('#share-url-box');
+    const qrWrap = $('#qr-wrap');
+    const qrImg = $('#qr-img');
+    const ipDetails = $('#ip-details');
+    const ipList = $('#ip-list');
     const uploadArea = $('#upload-area');
     const fileInput = $('#file-input');
-    const playerCard = $('#player-card');
     const tracksCard = $('#tracks-card');
     const tracksList = $('#tracks-list');
+    const playerCard = $('#player-card');
     const trackName = $('#track-name');
     const trackMeta = $('#track-meta');
     const progressBg = $('#progress-bg');
     const progressFill = $('#progress-fill');
-    const timeCurrent = $('#time-current');
+    const timeCur = $('#time-cur');
     const timeTotal = $('#time-total');
     const btnPlay = $('#btn-play');
     const btnStop = $('#btn-stop');
     const btnResync = $('#btn-resync');
     const volumeSlider = $('#volume');
     const deviceList = $('#device-list');
-    const toast = $('#toast');
     const diagCard = $('#diag-card');
     const diagLog = $('#diag-log');
+    const toastEl = $('#toast');
 
-    // ── Diagnostics log ──────────────────────────────
+    // ── Helpers ────────────────────
+    function fmt(sec) {
+      if (!sec || isNaN(sec)) return '0:00';
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function showToast(text) {
+      toastEl.textContent = text;
+      toastEl.classList.add('show');
+      setTimeout(() => toastEl.classList.remove('show'), 2500);
+    }
+
     function dlog(msg, type = 'info') {
-      const colors = { ok: '#00b894', fail: '#e17055', info: '#8888a8', warn: '#fdcb6e' };
-      const prefix = { ok: 'OK', fail: 'FAIL', info: 'INFO', warn: 'WARN' };
-      const line = document.createElement('div');
-      line.innerHTML = `<span style="color:${colors[type]}">[${prefix[type]}]</span> ${msg}`;
-      diagLog.appendChild(line);
+      const c = { ok: '#00b894', fail: '#e17055', info: '#8888a8', warn: '#fdcb6e' };
+      const p = { ok: 'OK', fail: 'FAIL', info: '--', warn: '!!' };
+      const d = document.createElement('div');
+      d.innerHTML = `<span style="color:${c[type]}">[${p[type]}]</span> ${msg}`;
+      diagLog.appendChild(d);
       diagLog.scrollTop = diagLog.scrollHeight;
     }
 
-    // ── Audio Context ────────────────────────────────
-    function ensureAudioCtx() {
+    // ── Audio Context ──────────────
+    function ensureAudio() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         gainNode = audioCtx.createGain();
         gainNode.connect(audioCtx.destination);
       }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
-    // ── WebSocket (with proper error handling + reconnect) ──
-    function connect() {
-      // Clean up any existing connection
-      if (ws) {
-        try { ws.onclose = null; ws.onerror = null; ws.close(); } catch {}
-        ws = null;
-      }
-      if (wsConnectTimer) { clearTimeout(wsConnectTimer); wsConnectTimer = null; }
+    // ── Socket.IO connection ───────
+    function initSocket() {
+      // Socket.IO auto-detects the server URL from the page origin.
+      // It will try WebSocket first, fall back to HTTP long-polling.
+      socket = io({
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 10000
+      });
 
-      const wsUrl = `ws://${location.host}`;
-
-      connDot.classList.add('disconnected');
-      connText.textContent = 'Connecting...';
-
-      // Set a connection timeout — if WS doesn't open in 5s, something is wrong
-      let opened = false;
-      wsConnectTimer = setTimeout(() => {
-        if (!opened) {
-          dlog(`WebSocket connection timed out after 5s to ${wsUrl}`, 'fail');
-          dlog('This usually means a firewall is blocking the port, or the server is not running', 'warn');
-          diagCard.style.display = '';
-          try { ws.close(); } catch {}
-          scheduleReconnect();
-        }
-      }, 5000);
-
-      try {
-        ws = new WebSocket(wsUrl);
-      } catch (err) {
-        dlog(`WebSocket constructor failed: ${err.message}`, 'fail');
-        diagCard.style.display = '';
-        scheduleReconnect();
-        return;
-      }
-
-      ws.onopen = () => {
-        opened = true;
-        clearTimeout(wsConnectTimer);
-        reconnectDelay = 1000; // reset backoff
-        connDot.classList.remove('disconnected');
+      socket.on('connect', () => {
+        connDot.classList.add('ok');
         connText.textContent = 'Connected';
-        dlog(`WebSocket connected to ${wsUrl}`, 'ok');
-      };
+        const t = socket.io.engine.transport.name;
+        dlog(`Connected via ${t}`, 'ok');
+      });
 
-      ws.onerror = (evt) => {
-        // onerror fires before onclose — log the error
-        dlog(`WebSocket error (server: ${location.host})`, 'fail');
+      socket.io.engine && socket.io.engine.on && socket.io.engine.on('upgrade', (t) => {
+        dlog(`Transport upgraded to ${t.name}`, 'ok');
+      });
+
+      socket.on('disconnect', (reason) => {
+        connDot.classList.remove('ok');
+        connText.textContent = 'Reconnecting...';
+        syncDot.className = 'sync-dot error';
+        syncLabel.innerHTML = `Disconnected <small>${reason}</small>`;
+        dlog(`Disconnected: ${reason}`, 'warn');
+      });
+
+      socket.on('connect_error', (err) => {
+        connDot.classList.remove('ok');
+        connText.textContent = 'Connection failed';
+        dlog(`Connection error: ${err.message}`, 'fail');
         diagCard.style.display = '';
-      };
+      });
 
-      ws.onclose = (evt) => {
-        opened = false;
-        clearTimeout(wsConnectTimer);
-        connDot.classList.add('disconnected');
-        connText.textContent = 'Disconnected';
-        dlog(`WebSocket closed (code=${evt.code}, reason=${evt.reason || 'none'})`, 'warn');
-        scheduleReconnect();
-      };
+      socket.on('reconnect_attempt', (n) => {
+        connText.textContent = `Retry #${n}...`;
+      });
 
-      ws.onmessage = (e) => {
-        let msg;
-        try { msg = JSON.parse(e.data); } catch { return; }
-        handleServerMessage(msg);
-      };
-    }
+      socket.on('reconnect', () => {
+        connDot.classList.add('ok');
+        connText.textContent = 'Reconnected';
+        showToast('Reconnected to server');
+      });
 
-    function scheduleReconnect() {
-      const delay = Math.min(reconnectDelay, 10000);
-      dlog(`Reconnecting in ${delay / 1000}s...`, 'info');
-      connText.textContent = `Reconnecting in ${delay / 1000}s...`;
-      wsConnectTimer = setTimeout(() => {
-        reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
-        connect();
-      }, delay);
-    }
+      // ── App events ──────────────────
+      socket.on('welcome', (data) => {
+        myClientId = data.clientId;
+        isHost = data.isHost;
+        connText.textContent = `Device #${data.clientId}`;
+        if (data.currentTrack) loadTrack(data.currentTrack.url, data.currentTrack.filename);
+      });
 
-    function sendMsg(obj) {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(obj));
-      }
-    }
+      socket.on('you-are-host', () => {
+        isHost = true;
+        showToast('You are now the host');
+      });
 
-    // ── Handle server messages ───────────────────────
-    function handleServerMessage(msg) {
-      switch (msg.type) {
-        case 'welcome':
-          myClientId = msg.clientId;
-          isHost = msg.isHost;
-          connText.textContent = `Device #${msg.clientId}`;
-          if (msg.currentTrack) {
-            loadTrack(msg.currentTrack.url, msg.currentTrack.filename);
-          }
-          break;
+      socket.on('clock-ping', (data) => {
+        socket.emit('clock-pong', { t0: data.t0, clientTime: Date.now() });
+        syncDot.className = 'sync-dot';
+        syncLabel.innerHTML = 'Synchronizing... <small>measuring offset</small>';
+      });
 
-        case 'you-are-host':
-          isHost = true;
-          showToast('You are now the host');
-          break;
+      socket.on('sync-done', (data) => {
+        syncDot.className = 'sync-dot synced';
+        syncLabel.innerHTML = `Synced <small>offset: ${Math.round(data.offset)}ms, RTT: ${data.rtt}ms</small>`;
+        socket.emit('ready');
+      });
 
-        case 'ping':
-          // Respond immediately for clock sync
-          sendMsg({ type: 'pong', t0: msg.t0, clientTime: Date.now() });
-          setSyncState('syncing', 'Synchronizing...', 'Measuring clock offset...');
-          break;
+      socket.on('track-loaded', (data) => {
+        loadTrack(data.url, data.filename);
+      });
 
-        case 'sync-done':
-          clockOffset = msg.offset;
-          setSyncState('synced', 'Synced', `Clock offset: ${Math.round(msg.offset)}ms`);
-          sendMsg({ type: 'ready' });
-          break;
+      socket.on('play-at', (data) => {
+        ensureAudio();
+        const now = Date.now();
+        const delay = data.time - now;
+        const seekTo = data.seekTo || 0;
 
-        case 'track-loaded':
-          loadTrack(msg.url, msg.filename);
-          break;
-
-        case 'play-at': {
-          ensureAudioCtx();
-          const now = Date.now();
-          const delay = msg.time - now;
-          const seekTo = msg.seekTo || 0;
-
-          if (delay > 0) {
-            // Schedule playback in the future
-            setTimeout(() => startPlayback(seekTo), delay);
-          } else {
-            // Already past the target time, play immediately with offset
-            startPlayback(seekTo + Math.abs(delay) / 1000);
-          }
-          break;
+        if (delay > 0) {
+          setTimeout(() => startPlayback(seekTo), delay);
+        } else {
+          startPlayback(seekTo + Math.abs(delay) / 1000);
         }
+      });
 
-        case 'pause':
-          pausePlayback();
-          break;
+      socket.on('pause', () => pausePlayback());
+      socket.on('stop', () => stopPlayback());
 
-        case 'stop':
-          stopPlayback();
-          break;
+      socket.on('set-volume', (data) => {
+        volumeSlider.value = data.volume;
+        if (gainNode) gainNode.gain.value = data.volume;
+      });
 
-        case 'set-volume':
-          volumeSlider.value = msg.volume;
-          if (gainNode) gainNode.gain.value = msg.volume;
-          break;
+      socket.on('client-count', (data) => {
+        connText.textContent = isHost
+          ? `Host \u00b7 ${data.count} device${data.count > 1 ? 's' : ''}`
+          : `Device #${myClientId} \u00b7 ${data.count} connected`;
+      });
 
-        case 'client-count':
-          connText.textContent = isHost
-            ? `Host · ${msg.count} device${msg.count > 1 ? 's' : ''}`
-            : `Device #${myClientId} · ${msg.count} connected`;
-          break;
-
-        case 'device-list':
-          renderDeviceList(msg.devices);
-          break;
-      }
+      socket.on('device-list', (data) => renderDevices(data.devices));
     }
 
-    // ── Sync state UI ────────────────────────────────
-    function setSyncState(state, title, detail) {
-      syncIcon.className = `sync-icon ${state}`;
-      syncIcon.innerHTML = state === 'synced' ? '&#10003;' : state === 'syncing' ? '&#8635;' : '&#10007;';
-      syncTitle.textContent = title;
-      syncDetail.textContent = detail;
-    }
-
-    // ── Load audio track ─────────────────────────────
+    // ── Track loading ──────────────
     async function loadTrack(url, filename) {
-      ensureAudioCtx();
+      ensureAudio();
       currentTrackUrl = url;
       trackName.textContent = filename;
-      trackMeta.textContent = 'Loading audio...';
+      trackMeta.textContent = 'Loading...';
       playerCard.style.display = '';
 
       try {
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
-        audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-
-        trackMeta.textContent = `${formatTime(audioBuffer.duration)} · ${audioBuffer.numberOfChannels}ch · ${audioBuffer.sampleRate}Hz`;
-        timeTotal.textContent = formatTime(audioBuffer.duration);
+        const res = await fetch(url);
+        const buf = await res.arrayBuffer();
+        audioBuffer = await audioCtx.decodeAudioData(buf);
+        trackMeta.textContent = `${fmt(audioBuffer.duration)} \u00b7 ${audioBuffer.numberOfChannels}ch \u00b7 ${audioBuffer.sampleRate}Hz`;
+        timeTotal.textContent = fmt(audioBuffer.duration);
         progressFill.style.width = '0%';
-        timeCurrent.textContent = '0:00';
-
+        timeCur.textContent = '0:00';
         showToast(`Loaded: ${filename}`);
-        sendMsg({ type: 'ready' });
+        socket.emit('ready');
       } catch (err) {
-        trackMeta.textContent = 'Failed to load audio';
-        console.error('Audio load error:', err);
+        trackMeta.textContent = 'Failed to load';
+        console.error(err);
       }
-
       loadTrackList();
     }
 
-    // ── Playback ─────────────────────────────────────
+    // ── Playback ───────────────────
     function startPlayback(seekTo = 0) {
       if (!audioBuffer) return;
-      ensureAudioCtx();
+      ensureAudio();
 
-      // Stop existing source
-      if (sourceNode) {
-        try { sourceNode.stop(); } catch {}
-      }
+      if (sourceNode) { try { sourceNode.stop(); } catch {} }
 
       sourceNode = audioCtx.createBufferSource();
       sourceNode.buffer = audioBuffer;
@@ -908,12 +585,11 @@
       const offset = Math.min(seekTo, audioBuffer.duration);
       sourceNode.start(0, offset);
       isPlaying = true;
-      playStartLocalTime = Date.now();
+      playStartTime = Date.now();
       playStartOffset = offset;
-
       btnPlay.innerHTML = '&#10074;&#10074;';
-      trackMeta.textContent = 'Playing synced';
-      startProgressUpdate();
+      trackMeta.textContent = 'Playing (synced)';
+      updateProgress();
 
       sourceNode.onended = () => {
         if (isPlaying) {
@@ -926,696 +602,214 @@
     }
 
     function pausePlayback() {
-      if (sourceNode && isPlaying) {
-        try { sourceNode.stop(); } catch {}
-        isPlaying = false;
-        btnPlay.innerHTML = '&#9654;';
-        cancelAnimationFrame(progressRAF);
-      }
+      if (sourceNode && isPlaying) { try { sourceNode.stop(); } catch {} }
+      isPlaying = false;
+      btnPlay.innerHTML = '&#9654;';
+      cancelAnimationFrame(progressRAF);
     }
 
     function stopPlayback() {
-      if (sourceNode) {
-        try { sourceNode.stop(); } catch {}
-      }
+      if (sourceNode) { try { sourceNode.stop(); } catch {} }
       isPlaying = false;
       playStartOffset = 0;
       btnPlay.innerHTML = '&#9654;';
       progressFill.style.width = '0%';
-      timeCurrent.textContent = '0:00';
+      timeCur.textContent = '0:00';
       trackMeta.textContent = 'Stopped';
       cancelAnimationFrame(progressRAF);
     }
 
-    function getCurrentTime() {
+    function getCurTime() {
       if (!isPlaying) return playStartOffset;
-      return playStartOffset + (Date.now() - playStartLocalTime) / 1000;
+      return playStartOffset + (Date.now() - playStartTime) / 1000;
     }
 
-    function startProgressUpdate() {
-      function update() {
-        if (!isPlaying || !audioBuffer) return;
-        const t = getCurrentTime();
-        const pct = Math.min(t / audioBuffer.duration * 100, 100);
-        progressFill.style.width = pct + '%';
-        timeCurrent.textContent = formatTime(t);
-        progressRAF = requestAnimationFrame(update);
-      }
-      update();
+    function updateProgress() {
+      if (!isPlaying || !audioBuffer) return;
+      const t = getCurTime();
+      progressFill.style.width = Math.min(t / audioBuffer.duration * 100, 100) + '%';
+      timeCur.textContent = fmt(t);
+      progressRAF = requestAnimationFrame(updateProgress);
     }
 
-    // ── Track list ───────────────────────────────────
+    // ── Track list ─────────────────
     async function loadTrackList() {
       try {
         const res = await fetch('/tracks');
         const tracks = await res.json();
-        if (tracks.length === 0) {
-          tracksCard.style.display = 'none';
-          return;
-        }
+        if (!tracks.length) { tracksCard.style.display = 'none'; return; }
         tracksCard.style.display = '';
         tracksList.innerHTML = tracks.map(t => `
           <div class="track-item ${t.url === currentTrackUrl ? 'active' : ''}"
-               onclick="selectTrack('${t.url}', '${t.filename.replace(/'/g, "\\'")}')">
+               onclick="selectTrack('${t.url}','${t.filename.replace(/'/g,"\\'")}')">
             <span class="icon">&#9835;</span>
             <span class="name">${t.filename}</span>
-          </div>
-        `).join('');
+          </div>`).join('');
       } catch {}
     }
 
     function selectTrack(url, filename) {
-      sendMsg({ type: 'select-track', url, filename });
+      socket.emit('select-track', { url, filename });
     }
 
-    // ── Device list ──────────────────────────────────
-    function renderDeviceList(devices) {
-      if (!devices || devices.length === 0) {
-        deviceList.innerHTML = '<div class="empty-state">Waiting for devices...</div>';
+    // ── Device list ────────────────
+    function renderDevices(devices) {
+      if (!devices || !devices.length) {
+        deviceList.innerHTML = '<div class="empty">Waiting for devices...</div>';
         return;
       }
       deviceList.innerHTML = devices.map(d => `
         <div class="device-item">
           <div class="device-icon">${d.isHost ? '&#9733;' : '&#128266;'}</div>
           <div class="device-details">
-            <div class="device-name">${d.name} ${d.id === myClientId ? '(You)' : ''}</div>
-            <div class="device-status">Offset: ${d.offset}ms · ${d.ready ? 'Ready' : 'Syncing...'}</div>
+            <div class="device-name">${d.name}${d.id === myClientId ? ' (You)' : ''}</div>
+            <div class="device-status">Offset: ${d.offset}ms \u00b7 ${d.ready ? 'Ready' : 'Syncing...'}</div>
           </div>
           ${d.isHost ? '<span class="host-badge">HOST</span>' : ''}
-        </div>
-      `).join('');
+        </div>`).join('');
     }
 
-    // ── Event handlers ───────────────────────────────
+    // ── Connection info ────────────
+    async function loadConnectionInfo() {
+      const cur = location.origin;
 
-    // Upload
-    uploadArea.addEventListener('click', () => {
-      ensureAudioCtx();
-      fileInput.click();
-    });
+      // Use current URL if already accessed via IP
+      if (!/localhost|127\.0\.0\.1/.test(location.hostname)) {
+        shareUrl.textContent = cur;
+      }
 
-    fileInput.addEventListener('change', (e) => {
-      if (e.target.files[0]) uploadFile(e.target.files[0]);
-    });
+      try {
+        const res = await fetch('/connection-info');
+        const info = await res.json();
 
-    uploadArea.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      uploadArea.classList.add('dragover');
-    });
+        // QR code (server-generated, reliable)
+        if (info.qrDataUrl) {
+          qrImg.src = info.qrDataUrl;
+          qrWrap.style.display = '';
+        }
 
-    uploadArea.addEventListener('dragleave', () => {
-      uploadArea.classList.remove('dragover');
-    });
+        if (info.ips && info.ips.length > 0) {
+          const primary = `http://${info.ips[0].address}:${info.port}`;
+          if (/localhost|127\.0\.0\.1/.test(location.hostname)) {
+            shareUrl.textContent = primary;
+          }
 
-    uploadArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      uploadArea.classList.remove('dragover');
+          if (info.ips.length > 0) {
+            ipDetails.style.display = '';
+            ipList.innerHTML = info.ips.map(ip =>
+              `<div class="ip-item">http://${ip.address}:${info.port} <span>(${ip.name})</span></div>`
+            ).join('');
+          }
+        } else {
+          shareUrl.textContent = cur;
+          ipDetails.style.display = '';
+          ipList.innerHTML = '<div class="ip-item" style="color:var(--warning)">No network interfaces found. Check WiFi connection.</div>';
+        }
+      } catch {
+        shareUrl.textContent = cur;
+      }
+    }
+
+    // ── Diagnostics ────────────────
+    async function runDiagnostics() {
+      diagLog.innerHTML = '';
+      diagCard.style.display = '';
+      dlog(`Page: ${location.href}`, 'info');
+      dlog(`Protocol: ${location.protocol}`, 'info');
+
+      if (location.protocol === 'https:') {
+        dlog('HTTPS detected \u2014 WebSocket needs wss:// (SSL on server)', 'fail');
+        dlog('Try accessing via http:// instead', 'warn');
+      }
+
+      try {
+        const r = await fetch('/health', { signal: AbortSignal.timeout(5000) });
+        if (r.ok) {
+          const d = await r.json();
+          dlog(`HTTP OK \u2014 ${d.clients} clients, port ${d.port}`, 'ok');
+        } else {
+          dlog(`HTTP status ${r.status}`, 'fail');
+        }
+      } catch (e) {
+        dlog(`HTTP failed: ${e.message}`, 'fail');
+        return;
+      }
+
+      dlog(`Socket.IO state: ${socket ? socket.connected ? 'connected' : 'disconnected' : 'not initialized'}`, socket?.connected ? 'ok' : 'fail');
+      if (socket && socket.io && socket.io.engine) {
+        dlog(`Transport: ${socket.io.engine.transport.name}`, 'info');
+      }
+
+      try {
+        const r = await fetch('/connection-info');
+        const info = await r.json();
+        for (const ip of (info.ips || [])) {
+          dlog(`Server IP: ${ip.address} (${ip.name})`, 'info');
+        }
+      } catch {}
+    }
+
+    // ── Event handlers ─────────────
+    uploadArea.addEventListener('click', () => { ensureAudio(); fileInput.click(); });
+    fileInput.addEventListener('change', e => { if (e.target.files[0]) uploadFile(e.target.files[0]); });
+    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', e => {
+      e.preventDefault(); uploadArea.classList.remove('dragover');
       if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
     });
 
     async function uploadFile(file) {
       const form = new FormData();
       form.append('audio', file);
-      trackMeta.textContent = 'Uploading...';
-
       try {
-        const res = await fetch('/upload', { method: 'POST', body: form });
-        const data = await res.json();
-        if (!data.success) showToast('Upload failed');
-      } catch (err) {
-        showToast('Upload failed');
-      }
+        const r = await fetch('/upload', { method: 'POST', body: form });
+        const d = await r.json();
+        if (!d.success) showToast('Upload failed');
+      } catch { showToast('Upload failed'); }
     }
 
-    // Play/Pause
     btnPlay.addEventListener('click', () => {
-      ensureAudioCtx();
+      ensureAudio();
       if (!audioBuffer) return showToast('Load a track first');
-
-      if (isPlaying) {
-        sendMsg({ type: 'pause' });
-      } else {
-        sendMsg({ type: 'play', seekTo: 0 });
-      }
+      socket.emit(isPlaying ? 'pause' : 'play', { seekTo: 0 });
     });
 
-    // Stop
-    btnStop.addEventListener('click', () => {
-      sendMsg({ type: 'stop' });
-    });
+    btnStop.addEventListener('click', () => socket.emit('stop'));
+    btnResync.addEventListener('click', () => { socket.emit('resync'); showToast('Re-syncing...'); });
 
-    // Re-sync
-    btnResync.addEventListener('click', () => {
-      sendMsg({ type: 'resync' });
-      showToast('Re-syncing all devices...');
-    });
-
-    // Volume
-    volumeSlider.addEventListener('input', (e) => {
+    volumeSlider.addEventListener('input', e => {
       const v = parseFloat(e.target.value);
       if (gainNode) gainNode.gain.value = v;
-      sendMsg({ type: 'set-volume', volume: v });
+      socket.emit('set-volume', { volume: v });
     });
 
-    // Seek (click on progress bar)
-    progressBg.addEventListener('click', (e) => {
+    progressBg.addEventListener('click', e => {
       if (!audioBuffer) return;
-      const rect = progressBg.getBoundingClientRect();
-      const pct = (e.clientX - rect.left) / rect.width;
-      const seekTo = pct * audioBuffer.duration;
-      sendMsg({ type: 'play', seekTo });
+      const pct = (e.clientX - progressBg.getBoundingClientRect().left) / progressBg.offsetWidth;
+      socket.emit('play', { seekTo: pct * audioBuffer.duration });
     });
 
-    // ── Helpers ──────────────────────────────────────
-    function formatTime(sec) {
-      if (!sec || isNaN(sec)) return '0:00';
-      const m = Math.floor(sec / 60);
-      const s = Math.floor(sec % 60);
-      return `${m}:${s.toString().padStart(2, '0')}`;
-    }
-
-    function showToast(text) {
-      toast.textContent = text;
-      toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 2500);
-    }
-
-    // ── QR Code generator (minimal, no dependencies) ─
-    // Encodes text into a QR code and draws it on a canvas.
-    // Uses a basic alphanumeric QR encoder — sufficient for short URLs.
-    const QR = (() => {
-      // We use a tiny third-party-free approach: render via an img from a
-      // Google Charts-style API replacement using a local SVG data URI.
-      // Actually, for reliability, we'll use a minimal QR matrix builder.
-      // But to keep this truly dependency-free AND correct, we use the
-      // well-tested "QR code as table" trick rendered to canvas.
-
-      // Minimal QR code implementation based on the QR algorithm.
-      // For POC simplicity, we use a known-working approach: encode the URL
-      // and generate the pattern. However, a full QR encoder is 3000+ lines.
-      //
-      // PRAGMATIC APPROACH: We render a scannable QR code using a data URI
-      // pointing to a publicly-cacheable, well-known endpoint. But since we
-      // want zero external dependencies, we'll use an alternative:
-      //
-      // Generate a QR-like connection helper using a simple visual grid
-      // that encodes the URL. OR, embed a minimal QR lib inline.
-      //
-      // Best approach for POC: use the qr-creator pattern (MIT, ~180 lines).
-      // Below is a self-contained QR encoder.
-
-      function generate(text, canvas, cellSize = 4) {
-        const mods = encode(text);
-        const size = mods.length * cellSize;
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, size, size);
-        ctx.fillStyle = '#000000';
-        for (let r = 0; r < mods.length; r++) {
-          for (let c = 0; c < mods.length; c++) {
-            if (mods[r][c]) {
-              ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
-            }
-          }
-        }
-      }
-
-      // Minimal QR Code encoder — version 1-6, error correction L
-      // This is a condensed but functional implementation.
-      function encode(text) {
-        const data = encodeData(text);
-        const ver = getVersion(data.length);
-        const size = ver * 4 + 17;
-        const grid = Array.from({length: size}, () => new Uint8Array(size));
-        const reserved = Array.from({length: size}, () => new Uint8Array(size));
-
-        placeFinderPatterns(grid, reserved, size);
-        placeAlignmentPatterns(grid, reserved, ver, size);
-        placeTimingPatterns(grid, reserved, size);
-        reserveFormatArea(reserved, size);
-
-        const bits = getDataBits(data, ver);
-        placeBits(grid, reserved, bits, size);
-
-        const mask = applyBestMask(grid, reserved, size);
-        placeFormatBits(grid, size, mask);
-
-        return grid;
-      }
-
-      function encodeData(text) {
-        // Byte mode
-        const bytes = new TextEncoder().encode(text);
-        return bytes;
-      }
-
-      function getVersion(dataLen) {
-        // Data capacity per version (byte mode, EC level L)
-        const caps = [0,17,32,53,78,106,134,154,192,230,271,321,367,425,458,520,586,644,718,792,858];
-        for (let v = 1; v < caps.length; v++) {
-          const overhead = v < 10 ? 2 : 3; // mode(4b) + count(8 or 16b) + terminator
-          if (dataLen + overhead <= caps[v]) return v;
-        }
-        return 20; // fallback
-      }
-
-      function placeFinderPatterns(grid, res, size) {
-        const positions = [[0,0],[0,size-7],[size-7,0]];
-        for (const [r,c] of positions) {
-          for (let dr = -1; dr <= 7; dr++) {
-            for (let dc = -1; dc <= 7; dc++) {
-              const rr = r+dr, cc = c+dc;
-              if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue;
-              const inOuter = dr >= 0 && dr <= 6 && dc >= 0 && dc <= 6;
-              const inInner = dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4;
-              const onBorder = dr === 0 || dr === 6 || dc === 0 || dc === 6;
-              grid[rr][cc] = (inOuter && (onBorder || inInner)) ? 1 : 0;
-              res[rr][cc] = 1;
-            }
-          }
-        }
-      }
-
-      function placeAlignmentPatterns(grid, res, ver, size) {
-        if (ver < 2) return;
-        const positions = getAlignmentPositions(ver);
-        for (const r of positions) {
-          for (const c of positions) {
-            if (res[r][c]) continue;
-            for (let dr = -2; dr <= 2; dr++) {
-              for (let dc = -2; dc <= 2; dc++) {
-                const rr = r+dr, cc = c+dc;
-                const on = Math.abs(dr) === 2 || Math.abs(dc) === 2 || (dr === 0 && dc === 0);
-                grid[rr][cc] = on ? 1 : 0;
-                res[rr][cc] = 1;
-              }
-            }
-          }
-        }
-      }
-
-      function getAlignmentPositions(ver) {
-        if (ver === 1) return [];
-        const intervals = [0,0,18,22,26,30,34,22,24,26,28,30,32,34,26,26,26,28,28,30,28];
-        const last = ver * 4 + 10;
-        const step = intervals[ver] || 28;
-        const pos = [6];
-        let p = last;
-        while (p > 6 + step - 1) { pos.unshift(p); p -= step; }
-        if (pos[0] !== 6) pos.unshift(6);
-        // Deduplicate
-        return [...new Set([6, ...pos.slice(1)])];
-      }
-
-      function placeTimingPatterns(grid, res, size) {
-        for (let i = 8; i < size - 8; i++) {
-          if (!res[6][i]) { grid[6][i] = i % 2 === 0 ? 1 : 0; res[6][i] = 1; }
-          if (!res[i][6]) { grid[i][6] = i % 2 === 0 ? 1 : 0; res[i][6] = 1; }
-        }
-      }
-
-      function reserveFormatArea(res, size) {
-        for (let i = 0; i < 8; i++) {
-          res[8][i] = 1; res[8][size-1-i] = 1;
-          res[i][8] = 1; res[size-1-i][8] = 1;
-        }
-        res[8][8] = 1;
-        res[size-8][8] = 1; // dark module
-      }
-
-      function getDataBits(data, ver) {
-        const totalCodewords = getCodewordCount(ver);
-        const ecCodewords = getECCount(ver);
-        const dataCodewords = totalCodewords - ecCodewords;
-
-        // Build bit stream
-        let bits = '';
-        // Mode indicator (0100 = byte mode)
-        bits += '0100';
-        // Character count
-        const countLen = ver < 10 ? 8 : 16;
-        bits += data.length.toString(2).padStart(countLen, '0');
-        // Data
-        for (const b of data) bits += b.toString(2).padStart(8, '0');
-        // Terminator
-        const capacity = dataCodewords * 8;
-        const termLen = Math.min(4, capacity - bits.length);
-        bits += '0'.repeat(termLen);
-        // Pad to byte boundary
-        while (bits.length % 8 !== 0) bits += '0';
-        // Pad bytes
-        const pads = ['11101100', '00010001'];
-        let pi = 0;
-        while (bits.length < capacity) { bits += pads[pi]; pi = 1 - pi; }
-
-        // Convert to codewords
-        const codewords = [];
-        for (let i = 0; i < bits.length; i += 8) {
-          codewords.push(parseInt(bits.substring(i, i+8), 2));
-        }
-
-        // Generate EC codewords using Reed-Solomon
-        const ec = reedSolomon(codewords, ecCodewords);
-        const all = [...codewords, ...ec];
-
-        // Convert back to bit string
-        let result = '';
-        for (const cw of all) result += cw.toString(2).padStart(8, '0');
-        // Remainder bits (for version >= 2)
-        const remainderBits = [0,0,7,7,7,7,7,0,0,0,0,0,0,0,3,3,3,3,3,3,3];
-        result += '0'.repeat(remainderBits[ver] || 0);
-
-        return result;
-      }
-
-      function getCodewordCount(ver) {
-        const counts = [0,26,44,70,100,134,172,196,242,292,346,404,466,532,581,655,733,815,901,991,1085];
-        return counts[ver] || 26;
-      }
-
-      function getECCount(ver) {
-        // EC codewords for level L
-        const counts = [0,7,10,15,20,26,18,20,24,30,18,20,24,26,30,22,24,28,30,28,28];
-        return counts[ver] || 7;
-      }
-
-      // GF(256) Reed-Solomon encoder
-      function reedSolomon(data, ecCount) {
-        const gfExp = new Uint8Array(512);
-        const gfLog = new Uint8Array(256);
-        let v = 1;
-        for (let i = 0; i < 255; i++) {
-          gfExp[i] = v;
-          gfLog[v] = i;
-          v = (v << 1) ^ (v >= 128 ? 0x11d : 0);
-        }
-        for (let i = 255; i < 512; i++) gfExp[i] = gfExp[i - 255];
-
-        function gfMul(a, b) {
-          if (a === 0 || b === 0) return 0;
-          return gfExp[gfLog[a] + gfLog[b]];
-        }
-
-        // Generator polynomial
-        let gen = [1];
-        for (let i = 0; i < ecCount; i++) {
-          const ng = new Array(gen.length + 1).fill(0);
-          for (let j = 0; j < gen.length; j++) {
-            ng[j] ^= gen[j];
-            ng[j+1] ^= gfMul(gen[j], gfExp[i]);
-          }
-          gen = ng;
-        }
-
-        const msg = new Array(data.length + ecCount).fill(0);
-        for (let i = 0; i < data.length; i++) msg[i] = data[i];
-
-        for (let i = 0; i < data.length; i++) {
-          const coef = msg[i];
-          if (coef !== 0) {
-            for (let j = 0; j < gen.length; j++) {
-              msg[i+j] ^= gfMul(gen[j], coef);
-            }
-          }
-        }
-
-        return msg.slice(data.length);
-      }
-
-      function placeBits(grid, res, bits, size) {
-        let bi = 0;
-        let upward = true;
-        for (let col = size - 1; col >= 1; col -= 2) {
-          if (col === 6) col = 5; // skip timing column
-          const rows = upward ? range(size-1, -1) : range(0, size);
-          for (const row of rows) {
-            for (const dc of [0, -1]) {
-              const c = col + dc;
-              if (c < 0 || res[row][c]) continue;
-              grid[row][c] = bi < bits.length ? parseInt(bits[bi++]) : 0;
-            }
-          }
-          upward = !upward;
-        }
-      }
-
-      function range(start, end) {
-        const arr = [];
-        if (start > end) { for (let i = start; i > end; i--) arr.push(i); }
-        else { for (let i = start; i < end; i++) arr.push(i); }
-        return arr;
-      }
-
-      function applyBestMask(grid, res, size) {
-        let bestMask = 0, bestScore = Infinity;
-        for (let m = 0; m < 8; m++) {
-          const copy = grid.map(r => new Uint8Array(r));
-          applyMask(copy, res, size, m);
-          const score = penaltyScore(copy, size);
-          if (score < bestScore) { bestScore = score; bestMask = m; }
-        }
-        applyMask(grid, res, size, bestMask);
-        return bestMask;
-      }
-
-      function applyMask(grid, res, size, mask) {
-        for (let r = 0; r < size; r++) {
-          for (let c = 0; c < size; c++) {
-            if (res[r][c]) continue;
-            let flip = false;
-            switch (mask) {
-              case 0: flip = (r+c) % 2 === 0; break;
-              case 1: flip = r % 2 === 0; break;
-              case 2: flip = c % 3 === 0; break;
-              case 3: flip = (r+c) % 3 === 0; break;
-              case 4: flip = (Math.floor(r/2)+Math.floor(c/3)) % 2 === 0; break;
-              case 5: flip = (r*c)%2 + (r*c)%3 === 0; break;
-              case 6: flip = ((r*c)%2 + (r*c)%3) % 2 === 0; break;
-              case 7: flip = ((r+c)%2 + (r*c)%3) % 2 === 0; break;
-            }
-            if (flip) grid[r][c] ^= 1;
-          }
-        }
-      }
-
-      function penaltyScore(grid, size) {
-        let score = 0;
-        // Simplified penalty: count dark/light ratio deviation
-        let dark = 0;
-        for (let r = 0; r < size; r++)
-          for (let c = 0; c < size; c++)
-            if (grid[r][c]) dark++;
-        const pct = dark / (size * size) * 100;
-        score += Math.abs(Math.floor(pct / 5) * 5 - 50) * 2;
-        return score;
-      }
-
-      function placeFormatBits(grid, size, mask) {
-        // Format: EC level L (01) + mask pattern
-        const formatValue = (1 << 3) | mask; // EC L = 01
-        let fmt = formatValue;
-        let rem = fmt;
-        for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >> 9) * 0x537);
-        fmt = ((fmt << 10) | rem) ^ 0x5412;
-
-        const bits = fmt.toString(2).padStart(15, '0');
-        // Place format bits
-        const posH = [
-          [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],
-          [7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]
-        ];
-        const posV = [
-          [size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8],
-          [8,size-8],[8,size-7],[8,size-6],[8,size-5],[8,size-4],[8,size-3],[8,size-2],[8,size-1]
-        ];
-        for (let i = 0; i < 15; i++) {
-          const val = parseInt(bits[i]);
-          grid[posH[i][0]][posH[i][1]] = val;
-          grid[posV[i][0]][posV[i][1]] = val;
-        }
-        grid[size-8][8] = 1; // dark module
-      }
-
-      return { generate };
-    })();
-
-    // ── Connection info & QR ─────────────────────────
-    const shareUrl = $('#share-url');
-    const shareUrlBox = $('#share-url-box');
-    const qrCanvas = $('#qr-canvas');
-    const allIpsSection = $('#all-ips-section');
-    const allIpsList = $('#all-ips-list');
-
-    async function loadConnectionInfo() {
-      // Determine the URL to share
-      const currentUrl = window.location.href.replace(/\/$/, '');
-
-      // If accessed via IP already, use that
-      if (!/localhost|127\.0\.0\.1/.test(location.hostname)) {
-        shareUrl.textContent = currentUrl;
-        try { QR.generate(currentUrl, qrCanvas, 4); } catch(e) { console.warn('QR error', e); }
-      }
-
-      // Fetch server-detected IPs for the full list
-      try {
-        const res = await fetch('/connection-info');
-        const info = await res.json();
-
-        if (info.ips && info.ips.length > 0) {
-          // Use the first IP as primary if we're on localhost
-          if (/localhost|127\.0\.0\.1/.test(location.hostname)) {
-            const primaryUrl = `http://${info.ips[0].address}:${info.port}`;
-            shareUrl.textContent = primaryUrl;
-            try { QR.generate(primaryUrl, qrCanvas, 4); } catch(e) { console.warn('QR error', e); }
-          }
-
-          // Show all IPs
-          if (info.ips.length > 0) {
-            allIpsSection.style.display = '';
-            allIpsList.innerHTML = info.ips.map(ip =>
-              `<div class="ip-item">http://${ip.address}:${info.port} <span>(${ip.name})</span></div>`
-            ).join('');
-          }
-        } else {
-          // No IPs detected — show current URL anyway
-          shareUrl.textContent = currentUrl;
-          try { QR.generate(currentUrl, qrCanvas, 4); } catch(e) {}
-          allIpsSection.style.display = '';
-          allIpsList.innerHTML = `
-            <div class="ip-item" style="color:var(--warning)">
-              No network interfaces detected.<br>
-              Find your IP manually:<br>
-              Linux: <code>ip addr show</code><br>
-              Mac: <code>ifconfig</code><br>
-              Windows: <code>ipconfig</code><br>
-              Then open http://&lt;your-ip&gt;:${info.port}
-            </div>`;
-        }
-      } catch (e) {
-        shareUrl.textContent = currentUrl;
-        try { QR.generate(currentUrl, qrCanvas, 4); } catch(e2) {}
-      }
-    }
-
-    // Copy URL to clipboard
     shareUrlBox.addEventListener('click', async () => {
       const url = shareUrl.textContent;
       try {
         await navigator.clipboard.writeText(url);
-        showToast('URL copied to clipboard!');
+        showToast('URL copied!');
       } catch {
-        // Fallback
         const ta = document.createElement('textarea');
-        ta.value = url;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
+        ta.value = url; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
         showToast('URL copied!');
       }
     });
 
-    // ── Connectivity diagnostics ────────────────────
-    async function runDiagnostics() {
-      diagLog.innerHTML = '';
-      diagCard.style.display = '';
-      dlog(`Page served from: ${location.href}`, 'info');
-      dlog(`Protocol: ${location.protocol}, Host: ${location.host}`, 'info');
+    // ── Init ───────────────────────
+    document.addEventListener('click', () => ensureAudio(), { once: true });
+    document.addEventListener('touchstart', () => ensureAudio(), { once: true });
 
-      if (location.protocol === 'https:') {
-        dlog('Page loaded over HTTPS — WebSocket needs WSS which requires SSL cert on server', 'fail');
-        dlog('Fix: Access the page via HTTP (not HTTPS)', 'warn');
-      }
-
-      // Test 1: HTTP connectivity to /health
-      dlog('Testing HTTP connectivity to server...', 'info');
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch('/health', { signal: controller.signal });
-        clearTimeout(timeout);
-        if (res.ok) {
-          const data = await res.json();
-          dlog(`HTTP OK — server responded (${data.clients} clients connected)`, 'ok');
-        } else {
-          dlog(`HTTP error: status ${res.status}`, 'fail');
-        }
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          dlog('HTTP request timed out after 5s', 'fail');
-        } else {
-          dlog(`HTTP failed: ${err.message}`, 'fail');
-        }
-        dlog('The server may not be running, or a firewall is blocking the port', 'warn');
-        return;
-      }
-
-      // Test 2: WebSocket connectivity
-      dlog('Testing WebSocket connectivity...', 'info');
-      try {
-        const testWs = await new Promise((resolve, reject) => {
-          const s = new WebSocket(`ws://${location.host}`);
-          const t = setTimeout(() => { s.close(); reject(new Error('timeout')); }, 5000);
-          s.onopen = () => { clearTimeout(t); resolve(s); };
-          s.onerror = () => { clearTimeout(t); reject(new Error('connection refused')); };
-        });
-        dlog('WebSocket connected successfully', 'ok');
-        testWs.close();
-      } catch (err) {
-        dlog(`WebSocket failed: ${err.message}`, 'fail');
-        if (location.protocol === 'https:') {
-          dlog('Likely cause: page served over HTTPS but WS server is HTTP only', 'warn');
-        } else {
-          dlog('Likely cause: firewall, proxy, or antivirus blocking WebSocket upgrade', 'warn');
-        }
-      }
-
-      // Test 3: Show network info
-      dlog('Fetching server network info...', 'info');
-      try {
-        const res = await fetch('/connection-info');
-        const info = await res.json();
-        if (info.ips && info.ips.length > 0) {
-          for (const ip of info.ips) {
-            dlog(`Server IP: ${ip.address} (${ip.name})`, 'info');
-          }
-        } else {
-          dlog('Server has no detectable network interfaces!', 'fail');
-        }
-      } catch {}
-    }
-
-    // ── Init ─────────────────────────────────────────
-    // First test HTTP, then connect WebSocket
-    async function init() {
-      loadTrackList();
-      loadConnectionInfo();
-
-      // Quick HTTP pre-check — if this fails, show diagnostics immediately
-      try {
-        const res = await fetch('/health');
-        if (res.ok) {
-          connect(); // HTTP works, proceed to WebSocket
-        } else {
-          dlog('Server returned non-OK status', 'fail');
-          diagCard.style.display = '';
-          connect(); // try anyway
-        }
-      } catch (err) {
-        dlog(`Cannot reach server: ${err.message}`, 'fail');
-        diagCard.style.display = '';
-        runDiagnostics();
-        connect(); // try anyway, will retry
-      }
-    }
-
-    init();
-
-    // Activate audio context on first user interaction (mobile requirement)
-    document.addEventListener('click', () => ensureAudioCtx(), { once: true });
-    document.addEventListener('touchstart', () => ensureAudioCtx(), { once: true });
+    initSocket();
+    loadTrackList();
+    loadConnectionInfo();
   </script>
 </body>
 </html>
