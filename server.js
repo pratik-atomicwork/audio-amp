@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const QRCode = require('qrcode');
+const localtunnel = require('localtunnel');
 
 // ── Paths ─────────────────────────────────────────────────────────────
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -16,21 +17,15 @@ fs.mkdirSync(AUDIO_DIR, { recursive: true });
 const app = express();
 const server = http.createServer(app);
 
-// ── Socket.IO — the robust replacement for raw ws ─────────────────────
-// Socket.IO handles: WebSocket + HTTP long-polling fallback, automatic
-// reconnection, heartbeat keepalive, CORS, proxy traversal, buffering.
+// ── Socket.IO ─────────────────────────────────────────────────────────
 const io = new SocketIO(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  },
-  // Allow both transports — falls back to polling if WS is blocked
+  cors: { origin: '*', methods: ['GET', 'POST'] },
   transports: ['websocket', 'polling'],
-  // Ping every 10s, timeout after 20s — keeps connections alive through NATs
   pingInterval: 10000,
   pingTimeout: 20000,
-  // Allow large payloads for audio metadata
-  maxHttpBufferSize: 1e7
+  maxHttpBufferSize: 1e7,
+  // Required for localtunnel/reverse proxy
+  allowEIO3: true
 });
 
 // ── File upload ───────────────────────────────────────────────────────
@@ -52,14 +47,19 @@ const upload = multer({
 });
 
 // ── State ─────────────────────────────────────────────────────────────
-const clients = new Map(); // socket.id → { id, name, clockOffset, ready }
+const clients = new Map();
 let currentTrack = null;
 let isPlaying = false;
 let hostId = null;
 let nextClientId = 1;
 let actualPort = 3000;
+let tunnelUrl = null;     // Set once localtunnel connects
+let tunnelQrDataUrl = null;
 
-// ── Express middleware & routes ────────────────────────────────────────
+// ── Middleware ─────────────────────────────────────────────────────────
+// Trust proxy — required for localtunnel reverse proxy
+app.set('trust proxy', true);
+
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -68,9 +68,18 @@ app.use((req, res, next) => {
   next();
 });
 
+// Bypass localtunnel's interstitial page
+app.use((req, res, next) => {
+  if (req.headers['bypass-tunnel-reminder']) {
+    // Already handled by the header
+  }
+  next();
+});
+
 app.use(express.static(PUBLIC_DIR));
 app.use('/audio', express.static(AUDIO_DIR));
 
+// ── Routes ────────────────────────────────────────────────────────────
 app.post('/upload', upload.single('audio'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No valid audio file' });
   const url = `/audio/${req.file.filename}`;
@@ -92,19 +101,25 @@ app.get('/health', (req, res) => {
 
 app.get('/connection-info', async (req, res) => {
   const ips = getNetworkIPs();
-  const primary = ips[0];
-  let qrDataUrl = null;
-  if (primary) {
-    try {
-      qrDataUrl = await QRCode.toDataURL(`http://${primary.address}:${actualPort}`, {
-        width: 256, margin: 2, color: { dark: '#000', light: '#fff' }
-      });
-    } catch {}
+  const lanUrl = ips[0] ? `http://${ips[0].address}:${actualPort}` : null;
+
+  let lanQr = null;
+  if (lanUrl) {
+    try { lanQr = await QRCode.toDataURL(lanUrl, { width: 256, margin: 2 }); } catch {}
   }
-  res.json({ ips, port: actualPort, qrDataUrl });
+
+  res.json({
+    ips,
+    port: actualPort,
+    lanUrl,
+    lanQrDataUrl: lanQr,
+    tunnelUrl,
+    tunnelQrDataUrl,
+    tunnelStatus: tunnelUrl ? 'connected' : 'connecting'
+  });
 });
 
-// ── Socket.IO connection handling ─────────────────────────────────────
+// ── Socket.IO ─────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   const clientId = nextClientId++;
   const info = {
@@ -116,20 +131,14 @@ io.on('connection', (socket) => {
   };
   clients.set(socket.id, info);
 
-  // Assign host if needed
-  if (!hostId || !clients.has(hostId)) {
-    hostId = socket.id;
-  }
+  if (!hostId || !clients.has(hostId)) hostId = socket.id;
 
-  const transport = socket.conn.transport.name; // 'websocket' or 'polling'
-  console.log(`[+] Device ${clientId} connected via ${transport} (${clients.size} total)`);
-
-  // Log transport upgrades (polling → websocket)
+  const transport = socket.conn.transport.name;
+  console.log(`[+] Device ${clientId} via ${transport} (${clients.size} total)`);
   socket.conn.on('upgrade', (t) => {
     console.log(`    Device ${clientId} upgraded to ${t.name}`);
   });
 
-  // Send welcome
   socket.emit('welcome', {
     clientId,
     isHost: socket.id === hostId,
@@ -141,7 +150,6 @@ io.on('connection', (socket) => {
   io.emit('client-count', { count: clients.size });
   startClockSync(socket);
 
-  // ── Clock sync ────────────────────────────────────
   socket.on('clock-pong', (data) => {
     const now = Date.now();
     const rtt = now - data.t0;
@@ -149,139 +157,94 @@ io.on('connection', (socket) => {
     info.syncSamples.push({ offset, rtt });
 
     if (info.syncSamples.length >= 8) {
-      // Use median of best 5 RTTs for accuracy
       info.syncSamples.sort((a, b) => a.rtt - b.rtt);
       const best = info.syncSamples.slice(0, 5);
-      info.clockOffset = best.reduce((sum, s) => sum + s.offset, 0) / best.length;
+      info.clockOffset = best.reduce((s, x) => s + x.offset, 0) / best.length;
       info.syncSamples = [];
       socket.emit('sync-done', { offset: info.clockOffset, rtt: best[0].rtt });
-      console.log(`    Device ${clientId} synced: offset=${info.clockOffset.toFixed(1)}ms, bestRTT=${best[0].rtt}ms`);
+      console.log(`    Device ${clientId} synced: offset=${info.clockOffset.toFixed(1)}ms, RTT=${best[0].rtt}ms`);
     } else {
       setTimeout(() => sendPing(socket), 30);
     }
   });
 
-  // ── Playback controls ─────────────────────────────
   socket.on('play', (data) => {
     isPlaying = true;
-    const playAtServerTime = Date.now() + 400;
+    const playAt = Date.now() + 400;
     const seekTo = data.seekTo || 0;
-
-    for (const [sid, cInfo] of clients) {
-      const playAtClientTime = playAtServerTime + cInfo.clockOffset;
-      io.to(sid).emit('play-at', { time: playAtClientTime, seekTo });
+    for (const [sid, ci] of clients) {
+      io.to(sid).emit('play-at', { time: playAt + ci.clockOffset, seekTo });
     }
   });
 
-  socket.on('pause', () => {
-    isPlaying = false;
-    io.emit('pause');
-  });
-
-  socket.on('stop', () => {
-    isPlaying = false;
-    io.emit('stop');
-  });
+  socket.on('pause', () => { isPlaying = false; io.emit('pause'); });
+  socket.on('stop', () => { isPlaying = false; io.emit('stop'); });
 
   socket.on('select-track', (data) => {
     currentTrack = { filename: data.filename, url: data.url };
     isPlaying = false;
-    io.emit('track-loaded', { filename: data.filename, url: data.url });
+    io.emit('track-loaded', data);
   });
 
-  socket.on('set-volume', (data) => {
-    io.emit('set-volume', { volume: data.volume });
-  });
+  socket.on('set-volume', (data) => io.emit('set-volume', data));
 
   socket.on('resync', () => {
     for (const [sid] of clients) {
-      const cInfo = clients.get(sid);
-      cInfo.syncSamples = [];
+      clients.get(sid).syncSamples = [];
       const s = io.sockets.sockets.get(sid);
       if (s) startClockSync(s);
     }
   });
 
-  socket.on('set-name', (data) => {
-    info.name = data.name || info.name;
-    broadcastDeviceList();
-  });
+  socket.on('set-name', (data) => { info.name = data.name || info.name; broadcastDeviceList(); });
+  socket.on('ready', () => { info.ready = true; broadcastDeviceList(); });
 
-  socket.on('ready', () => {
-    info.ready = true;
-    broadcastDeviceList();
-  });
-
-  // ── Disconnect ────────────────────────────────────
   socket.on('disconnect', (reason) => {
     clients.delete(socket.id);
-    console.log(`[-] Device ${clientId} disconnected: ${reason} (${clients.size} remaining)`);
-
+    console.log(`[-] Device ${clientId} disconnected: ${reason} (${clients.size} left)`);
     if (socket.id === hostId) {
-      const firstKey = clients.keys().next().value;
-      hostId = firstKey || null;
-      if (hostId) {
-        io.to(hostId).emit('you-are-host');
-      }
+      hostId = clients.keys().next().value || null;
+      if (hostId) io.to(hostId).emit('you-are-host');
     }
     io.emit('client-count', { count: clients.size });
     broadcastDeviceList();
   });
 });
 
-// ── Clock sync helpers ────────────────────────────────────────────────
-function startClockSync(socket) {
-  sendPing(socket);
-}
+function startClockSync(socket) { sendPing(socket); }
+function sendPing(socket) { if (socket.connected) socket.emit('clock-ping', { t0: Date.now() }); }
 
-function sendPing(socket) {
-  if (socket.connected) {
-    socket.emit('clock-ping', { t0: Date.now() });
-  }
-}
-
-// ── Broadcast device list ─────────────────────────────────────────────
 function broadcastDeviceList() {
   const devices = [];
   for (const [sid, info] of clients) {
-    devices.push({
-      id: info.id,
-      name: info.name,
-      isHost: sid === hostId,
-      ready: info.ready,
-      offset: Math.round(info.clockOffset)
-    });
+    devices.push({ id: info.id, name: info.name, isHost: sid === hostId, ready: info.ready, offset: Math.round(info.clockOffset) });
   }
   io.emit('device-list', { devices });
 }
 
-// ── Network IP detection (filters VPN, Docker, etc.) ──────────────────
+// ── IP detection ──────────────────────────────────────────────────────
 function getNetworkIPs() {
   const ips = [];
   const nets = os.networkInterfaces();
-
-  // Priority order: wlan/wifi first, then eth, then others
   const sorted = Object.keys(nets).sort((a, b) => {
-    const score = (name) => {
-      const n = name.toLowerCase();
+    const score = (n) => {
+      n = n.toLowerCase();
       if (n.includes('wlan') || n.includes('wi-fi') || n.includes('wifi')) return 0;
-      if (n.includes('en0') || n.includes('en1')) return 1; // macOS WiFi
+      if (n.startsWith('en')) return 1;
       if (n.includes('eth')) return 2;
-      if (n.includes('bridge') || n.includes('docker') || n.includes('veth')) return 10;
-      if (n.includes('tun') || n.includes('tap') || n.includes('vpn')) return 11;
+      if (n.includes('docker') || n.includes('veth') || n.includes('br-')) return 10;
+      if (n.includes('tun') || n.includes('tap')) return 11;
       return 5;
     };
     return score(a) - score(b);
   });
-
   for (const name of sorted) {
     for (const net of nets[name]) {
       if (net.family === 'IPv4' && !net.internal) {
-        // Skip Docker, VPN, and virtual interfaces
         const n = name.toLowerCase();
         if (n.includes('docker') || n.includes('veth') || n.includes('br-')) continue;
         if (n.includes('tun') || n.includes('tap')) continue;
-        if (net.address.startsWith('172.17.')) continue; // Docker default
+        if (net.address.startsWith('172.17.')) continue;
         ips.push({ name, address: net.address });
       }
     }
@@ -289,7 +252,51 @@ function getNetworkIPs() {
   return ips;
 }
 
-// ── Start server with port fallback ───────────────────────────────────
+// ── Tunnel ────────────────────────────────────────────────────────────
+async function startTunnel(port) {
+  console.log('  Tunnel: opening...');
+  try {
+    const tunnel = await localtunnel({ port, allow_invalid_cert: true });
+    tunnelUrl = tunnel.url;
+
+    try {
+      tunnelQrDataUrl = await QRCode.toDataURL(tunnelUrl, { width: 256, margin: 2 });
+    } catch {}
+
+    console.log('');
+    console.log(`  ========================================`);
+    console.log(`  SHARE THIS URL (works from ANY device):`);
+    console.log(`  ${tunnelUrl}`);
+    console.log(`  ========================================`);
+
+    try {
+      const qr = await QRCode.toString(tunnelUrl, { type: 'terminal', small: true });
+      console.log('');
+      console.log('  Scan to connect from any device:');
+      console.log(qr.split('\n').map(l => '  ' + l).join('\n'));
+    } catch {}
+
+    // Notify already-connected clients about the tunnel URL
+    io.emit('tunnel-ready', { tunnelUrl, tunnelQrDataUrl });
+
+    tunnel.on('close', () => {
+      console.log('  Tunnel: closed, reopening...');
+      tunnelUrl = null;
+      tunnelQrDataUrl = null;
+      setTimeout(() => startTunnel(port), 3000);
+    });
+
+    tunnel.on('error', (err) => {
+      console.log(`  Tunnel error: ${err.message}`);
+    });
+  } catch (err) {
+    console.log(`  Tunnel failed: ${err.message}`);
+    console.log('  Retrying in 5s...');
+    setTimeout(() => startTunnel(port), 5000);
+  }
+}
+
+// ── Start ─────────────────────────────────────────────────────────────
 const BASE_PORT = parseInt(process.env.PORT, 10) || 3000;
 
 function tryListen(port) {
@@ -304,35 +311,14 @@ function tryListen(port) {
     console.log('  ├──────────────────────────────────────────────────┤');
     console.log(`  │  Local:   http://localhost:${port}                 │`);
     if (primary) {
-      console.log(`  │  Network: http://${primary.address}:${port}`.padEnd(53) + '│');
-    }
-    if (ips.length > 1) {
-      for (const ip of ips.slice(1)) {
-        console.log(`  │  Alt:     http://${ip.address}:${port} (${ip.name})`.padEnd(53) + '│');
-      }
+      console.log(`  │  LAN:     http://${primary.address}:${port}`.padEnd(53) + '│');
     }
     console.log('  ├──────────────────────────────────────────────────┤');
     console.log('  │  Transport: Socket.IO (WebSocket + polling)      │');
-    console.log('  │  Open the Network URL on all devices on same     │');
-    console.log('  │  WiFi to sync audio playback.                    │');
     console.log('  └──────────────────────────────────────────────────┘');
 
-    if (primary) {
-      try {
-        const qr = await QRCode.toString(`http://${primary.address}:${port}`, { type: 'terminal', small: true });
-        console.log('');
-        console.log('  Scan to connect:');
-        console.log(qr.split('\n').map(l => '  ' + l).join('\n'));
-      } catch {}
-    }
-
-    if (ips.length === 0) {
-      console.log('');
-      console.log('  WARNING: No network interfaces found!');
-      console.log('  Make sure this machine is on WiFi, then restart.');
-    }
-
-    console.log('');
+    // Start the tunnel — this is the reliable connection method
+    startTunnel(port);
   });
 
   server.on('error', (err) => {

@@ -6,262 +6,208 @@
   <title>AudioAmp</title>
   <style>
     :root {
-      --bg: #0a0a0f;
-      --surface: #141420;
-      --surface2: #1c1c2e;
-      --border: #2a2a40;
-      --primary: #6c5ce7;
-      --primary-glow: rgba(108, 92, 231, 0.3);
-      --accent: #00cec9;
-      --accent-glow: rgba(0, 206, 201, 0.3);
-      --text: #e8e8f0;
-      --text-dim: #8888a8;
-      --success: #00b894;
-      --warning: #fdcb6e;
-      --danger: #e17055;
+      --bg: #0a0a0f; --surface: #141420; --surface2: #1c1c2e; --border: #2a2a40;
+      --primary: #6c5ce7; --primary-glow: rgba(108,92,231,0.3);
+      --accent: #00cec9; --accent-glow: rgba(0,206,201,0.3);
+      --text: #e8e8f0; --text-dim: #8888a8;
+      --success: #00b894; --warning: #fdcb6e; --danger: #e17055;
       --radius: 12px;
     }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
+    * { margin:0; padding:0; box-sizing:border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      min-height: 100dvh;
-      overflow-x: hidden;
+      background: var(--bg); color: var(--text); min-height:100vh; min-height:100dvh;
     }
 
     .header {
-      padding: 16px 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
-      position: sticky;
-      top: 0;
-      z-index: 10;
+      padding:14px 20px; display:flex; align-items:center; justify-content:space-between;
+      border-bottom:1px solid var(--border); background:var(--surface);
+      position:sticky; top:0; z-index:10;
     }
-
-    .logo { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
+    .logo { display:flex; align-items:center; gap:8px; font-size:17px; font-weight:700; }
     .logo-icon {
-      width: 32px; height: 32px;
-      background: linear-gradient(135deg, var(--primary), var(--accent));
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center; font-size: 16px;
+      width:30px; height:30px; background:linear-gradient(135deg,var(--primary),var(--accent));
+      border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:15px;
     }
-
     .conn-badge {
-      display: flex; align-items: center; gap: 6px;
-      padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
-      background: var(--surface2); border: 1px solid var(--border);
+      display:flex; align-items:center; gap:6px;
+      padding:4px 10px; border-radius:20px; font-size:11px; font-weight:500;
+      background:var(--surface2); border:1px solid var(--border);
     }
-    .conn-dot {
-      width: 8px; height: 8px; border-radius: 50%; background: var(--danger);
-      transition: background 0.3s;
-    }
-    .conn-dot.ok { background: var(--success); animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.4 } }
+    .conn-dot { width:7px; height:7px; border-radius:50%; background:var(--danger); transition:background .3s; }
+    .conn-dot.ok { background:var(--success); }
 
-    .container { max-width: 480px; margin: 0 auto; padding: 16px; }
-
+    .container { max-width:460px; margin:0 auto; padding:14px; }
     .card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 18px; margin-bottom: 14px;
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--radius); padding:16px; margin-bottom:12px;
     }
     .card-title {
-      font-size: 11px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 1px; color: var(--text-dim); margin-bottom: 12px;
+      font-size:10px; font-weight:600; text-transform:uppercase;
+      letter-spacing:1px; color:var(--text-dim); margin-bottom:10px;
     }
 
-    /* ── Sync ─────────────────────── */
+    /* ── Share card ───── */
+    .share-card { border-color:var(--primary); box-shadow:0 0 20px var(--primary-glow); }
+    .share-mode-tabs {
+      display:flex; gap:4px; margin-bottom:12px; background:var(--bg);
+      border-radius:8px; padding:3px;
+    }
+    .share-tab {
+      flex:1; padding:7px 0; text-align:center; font-size:11px; font-weight:600;
+      border-radius:6px; cursor:pointer; color:var(--text-dim); transition:all .15s;
+      border:none; background:none;
+    }
+    .share-tab.active { background:var(--primary); color:#fff; }
+    .share-tab:hover:not(.active) { color:var(--text); }
+
+    .share-panel { display:none; }
+    .share-panel.active { display:block; }
+
+    .url-box {
+      display:flex; align-items:center; gap:6px;
+      background:var(--bg); border:1px solid var(--border); border-radius:10px;
+      padding:10px 12px; cursor:pointer; transition:border-color .15s; margin-bottom:10px;
+    }
+    .url-box:hover { border-color:var(--primary); }
+    .url-text {
+      flex:1; font-size:12px; font-weight:600;
+      font-family:'SF Mono','Fira Code',Consolas,monospace;
+      word-break:break-all; color:var(--accent);
+    }
+    .url-text.pending { color:var(--warning); font-style:italic; font-weight:400; }
+    .copy-btn { font-size:14px; color:var(--text-dim); flex-shrink:0; }
+
+    .qr-box {
+      display:flex; justify-content:center; padding:12px;
+      background:#fff; border-radius:10px; margin-bottom:8px;
+    }
+    .qr-box img { max-width:180px; max-height:180px; image-rendering:pixelated; }
+    .share-hint { font-size:10px; color:var(--text-dim); text-align:center; line-height:1.5; }
+    .tunnel-note {
+      font-size:10px; color:var(--warning); text-align:center; margin-top:6px;
+      padding:6px; background:rgba(253,203,110,0.08); border-radius:6px;
+    }
+
+    /* ── Sync ────────── */
     .sync-bar {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 14px; border-radius: var(--radius);
-      background: var(--surface2); margin-bottom: 14px; border: 1px solid var(--border);
+      display:flex; align-items:center; gap:8px;
+      padding:10px 12px; border-radius:var(--radius);
+      background:var(--surface2); margin-bottom:12px; border:1px solid var(--border);
     }
-    .sync-dot {
-      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
-      background: var(--warning); transition: background 0.3s;
-    }
-    .sync-dot.synced { background: var(--success); }
-    .sync-dot.error { background: var(--danger); }
-    .sync-label { font-size: 13px; }
-    .sync-label small { color: var(--text-dim); font-size: 11px; }
+    .sync-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; background:var(--warning); transition:background .3s; }
+    .sync-dot.synced { background:var(--success); }
+    .sync-dot.error { background:var(--danger); }
+    .sync-label { font-size:12px; }
+    .sync-label small { color:var(--text-dim); font-size:10px; }
 
-    /* ── Share ────────────────────── */
-    .share-card { border-color: var(--primary); box-shadow: 0 0 15px var(--primary-glow); }
-    .share-url-box {
-      display: flex; align-items: center; gap: 8px;
-      background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
-      padding: 10px 14px; cursor: pointer; transition: border-color 0.15s; margin-bottom: 12px;
-    }
-    .share-url-box:hover { border-color: var(--primary); }
-    .share-url {
-      flex: 1; font-size: 13px; font-weight: 600;
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      word-break: break-all; color: var(--accent);
-    }
-    .copy-icon { font-size: 16px; color: var(--text-dim); flex-shrink: 0; cursor: pointer; }
-
-    .qr-wrap {
-      display: flex; justify-content: center; padding: 12px;
-      background: #fff; border-radius: 10px; margin-bottom: 10px;
-    }
-    .qr-wrap img { max-width: 180px; max-height: 180px; image-rendering: pixelated; }
-    .share-hint { font-size: 11px; color: var(--text-dim); text-align: center; line-height: 1.5; }
-
-    .ip-list { margin-top: 10px; }
-    .ip-list summary { font-size: 11px; color: var(--text-dim); cursor: pointer; }
-    .ip-item {
-      font-size: 12px; padding: 3px 0;
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; color: var(--text);
-    }
-    .ip-item span { color: var(--text-dim); font-size: 10px; }
-
-    /* ── Upload ───────────────────── */
+    /* ── Upload ─────── */
     .upload-area {
-      border: 2px dashed var(--border); border-radius: var(--radius);
-      padding: 28px 16px; text-align: center; cursor: pointer; transition: all 0.2s;
+      border:2px dashed var(--border); border-radius:var(--radius);
+      padding:24px 14px; text-align:center; cursor:pointer; transition:all .2s;
     }
-    .upload-area:hover, .upload-area.dragover {
-      border-color: var(--primary); background: var(--primary-glow);
-    }
-    .upload-area .icon { font-size: 28px; margin-bottom: 6px; }
-    .upload-area p { color: var(--text-dim); font-size: 13px; }
-    .upload-area .formats { font-size: 10px; color: var(--text-dim); margin-top: 4px; opacity: 0.6; }
-    #file-input { display: none; }
+    .upload-area:hover,.upload-area.dragover { border-color:var(--primary); background:var(--primary-glow); }
+    .upload-area .icon { font-size:26px; margin-bottom:4px; }
+    .upload-area p { color:var(--text-dim); font-size:12px; }
+    .upload-area .formats { font-size:9px; color:var(--text-dim); margin-top:3px; opacity:.6; }
+    #file-input { display:none; }
 
-    /* ── Player ───────────────────── */
-    .track-info { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+    /* ── Player ─────── */
+    .track-info { display:flex; align-items:center; gap:10px; padding:8px 0; }
     .track-art {
-      width: 50px; height: 50px; border-radius: 10px;
-      background: linear-gradient(135deg, var(--primary), var(--accent));
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px; flex-shrink: 0;
+      width:46px; height:46px; border-radius:10px;
+      background:linear-gradient(135deg,var(--primary),var(--accent));
+      display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;
     }
-    .track-details { flex: 1; min-width: 0; }
-    .track-name {
-      font-size: 15px; font-weight: 600;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .track-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .track-details { flex:1; min-width:0; }
+    .track-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .track-meta { font-size:10px; color:var(--text-dim); margin-top:2px; }
 
-    .progress-wrap { margin: 12px 0; }
     .progress-bg {
-      width: 100%; height: 6px; background: var(--surface2);
-      border-radius: 3px; cursor: pointer; position: relative; overflow: hidden;
+      width:100%; height:5px; background:var(--surface2);
+      border-radius:3px; cursor:pointer; overflow:hidden; margin:10px 0 4px;
     }
     .progress-fill {
-      height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent));
-      border-radius: 3px; width: 0%; transition: width 0.15s linear;
+      height:100%; background:linear-gradient(90deg,var(--primary),var(--accent));
+      border-radius:3px; width:0%; transition:width .15s linear;
     }
     .time-row {
-      display: flex; justify-content: space-between;
-      font-size: 11px; color: var(--text-dim); margin-top: 5px;
-      font-variant-numeric: tabular-nums;
+      display:flex; justify-content:space-between;
+      font-size:10px; color:var(--text-dim); font-variant-numeric:tabular-nums;
     }
 
-    .controls { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 6px 0; }
+    .controls { display:flex; align-items:center; justify-content:center; gap:12px; padding:4px 0; }
     .ctrl-btn {
-      background: none; border: none; color: var(--text); cursor: pointer;
-      font-size: 20px; width: 44px; height: 44px;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: 50%; transition: all 0.15s;
+      background:none; border:none; color:var(--text); cursor:pointer;
+      font-size:18px; width:40px; height:40px;
+      display:flex; align-items:center; justify-content:center;
+      border-radius:50%; transition:all .15s;
     }
-    .ctrl-btn:hover { background: var(--surface2); }
-    .ctrl-btn:active { transform: scale(0.92); }
+    .ctrl-btn:hover { background:var(--surface2); }
+    .ctrl-btn:active { transform:scale(.92); }
     .ctrl-btn.play-btn {
-      width: 58px; height: 58px; font-size: 26px;
-      background: linear-gradient(135deg, var(--primary), #8b5cf6);
-      box-shadow: 0 4px 16px var(--primary-glow);
+      width:54px; height:54px; font-size:24px;
+      background:linear-gradient(135deg,var(--primary),#8b5cf6);
+      box-shadow:0 4px 14px var(--primary-glow);
     }
-    .ctrl-btn.play-btn:hover { box-shadow: 0 6px 24px var(--primary-glow); transform: scale(1.05); }
+    .ctrl-btn.play-btn:hover { box-shadow:0 6px 20px var(--primary-glow); transform:scale(1.05); }
 
-    .vol-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
-    .vol-row .icon { font-size: 16px; }
+    .vol-row { display:flex; align-items:center; gap:8px; padding:4px 0; }
+    .vol-row .icon { font-size:14px; }
     input[type="range"] {
-      -webkit-appearance: none; appearance: none;
-      flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; outline: none;
+      -webkit-appearance:none; appearance:none;
+      flex:1; height:4px; background:var(--surface2); border-radius:3px; outline:none;
     }
     input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 16px; height: 16px;
-      background: var(--primary); border-radius: 50%; cursor: pointer;
+      -webkit-appearance:none; width:14px; height:14px; background:var(--primary); border-radius:50%; cursor:pointer;
     }
     input[type="range"]::-moz-range-thumb {
-      width: 16px; height: 16px; background: var(--primary);
-      border-radius: 50%; cursor: pointer; border: none;
+      width:14px; height:14px; background:var(--primary); border-radius:50%; cursor:pointer; border:none;
     }
 
-    /* ── Devices ──────────────────── */
+    /* ── Devices ────── */
     .device-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 12px; background: var(--surface2); border-radius: 10px;
-      margin-bottom: 6px; border: 1px solid var(--border);
+      display:flex; align-items:center; gap:8px;
+      padding:8px 10px; background:var(--surface2); border-radius:8px;
+      margin-bottom:5px; border:1px solid var(--border);
     }
     .device-icon {
-      width: 32px; height: 32px; border-radius: 50%; background: var(--primary-glow);
-      display: flex; align-items: center; justify-content: center; font-size: 14px;
+      width:28px; height:28px; border-radius:50%; background:var(--primary-glow);
+      display:flex; align-items:center; justify-content:center; font-size:12px;
     }
-    .device-details { flex: 1; }
-    .device-name { font-size: 13px; font-weight: 500; }
-    .device-status { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+    .device-details { flex:1; }
+    .device-name { font-size:12px; font-weight:500; }
+    .device-status { font-size:9px; color:var(--text-dim); margin-top:1px; }
     .host-badge {
-      font-size: 9px; font-weight: 600; padding: 2px 7px; border-radius: 10px;
-      background: var(--accent-glow); color: var(--accent); border: 1px solid var(--accent);
+      font-size:8px; font-weight:600; padding:2px 6px; border-radius:8px;
+      background:var(--accent-glow); color:var(--accent); border:1px solid var(--accent);
     }
 
-    /* ── Tracks list ──────────────── */
+    /* ── Tracks ─────── */
     .track-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 9px 12px; background: var(--surface2); border-radius: 10px;
-      margin-bottom: 6px; cursor: pointer;
-      border: 1px solid var(--border); transition: all 0.15s;
+      display:flex; align-items:center; gap:8px;
+      padding:8px 10px; background:var(--surface2); border-radius:8px;
+      margin-bottom:5px; cursor:pointer; border:1px solid var(--border); transition:all .15s;
     }
-    .track-item:hover { border-color: var(--primary); background: var(--primary-glow); }
-    .track-item.active { border-color: var(--primary); }
-    .track-item .icon { font-size: 18px; }
-    .track-item .name {
-      flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-
-    /* ── Diagnostics ──────────────── */
-    .diag-log {
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-      font-size: 11px; color: var(--text-dim);
-      max-height: 180px; overflow-y: auto; line-height: 1.6;
-    }
-    .btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 16px; border-radius: 10px;
-      border: 1px solid var(--border); background: var(--surface2); color: var(--text);
-      font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s;
-    }
-    .btn:hover { border-color: var(--primary); background: var(--primary-glow); }
-    .btn-full { width: 100%; justify-content: center; }
+    .track-item:hover { border-color:var(--primary); background:var(--primary-glow); }
+    .track-item.active { border-color:var(--primary); }
+    .track-item .icon { font-size:16px; }
+    .track-item .name { flex:1; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
     .toast {
-      position: fixed; bottom: 20px; left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      padding: 10px 20px; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 10px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-      transition: transform 0.3s ease; z-index: 100; white-space: nowrap;
+      position:fixed; bottom:16px; left:50%;
+      transform:translateX(-50%) translateY(80px);
+      padding:8px 18px; background:var(--surface); border:1px solid var(--border);
+      border-radius:10px; font-size:11px; box-shadow:0 8px 20px rgba(0,0,0,.4);
+      transition:transform .3s ease; z-index:100; white-space:nowrap;
     }
-    .toast.show { transform: translateX(-50%) translateY(0); }
-
-    .empty { text-align: center; padding: 16px; color: var(--text-dim); font-size: 12px; }
-
-    @media (max-width: 360px) { .container { padding: 10px; } .card { padding: 14px; } }
+    .toast.show { transform:translateX(-50%) translateY(0); }
+    .empty { text-align:center; padding:14px; color:var(--text-dim); font-size:11px; }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo">
-      <div class="logo-icon">&#9835;</div>
-      <span>AudioAmp</span>
-    </div>
+    <div class="logo"><div class="logo-icon">&#9835;</div><span>AudioAmp</span></div>
     <div class="conn-badge">
       <div class="conn-dot" id="conn-dot"></div>
       <span id="conn-text">Connecting...</span>
@@ -269,47 +215,65 @@
   </div>
 
   <div class="container">
-    <!-- Sync -->
-    <div class="sync-bar" id="sync-bar">
+    <div class="sync-bar">
       <div class="sync-dot" id="sync-dot"></div>
-      <div class="sync-label" id="sync-label">Connecting to server... <small>waiting</small></div>
+      <div class="sync-label" id="sync-label">Connecting... <small>waiting</small></div>
     </div>
 
-    <!-- Share -->
+    <!-- ── Share / Connect ── -->
     <div class="card share-card" id="share-card">
       <div class="card-title">Connect Other Devices</div>
-      <div class="share-url-box" id="share-url-box" title="Tap to copy">
-        <span class="share-url" id="share-url">Detecting...</span>
-        <span class="copy-icon">&#128203;</span>
+      <div class="share-mode-tabs">
+        <button class="share-tab active" data-panel="tunnel" onclick="switchShareTab('tunnel')">Public URL (recommended)</button>
+        <button class="share-tab" data-panel="lan" onclick="switchShareTab('lan')">Local Network</button>
       </div>
-      <div class="qr-wrap" id="qr-wrap" style="display:none;">
-        <img id="qr-img" alt="QR Code">
+
+      <!-- Tunnel panel -->
+      <div class="share-panel active" id="panel-tunnel">
+        <div class="url-box" id="tunnel-url-box" onclick="copyUrl('tunnel-url')">
+          <span class="url-text pending" id="tunnel-url">Opening tunnel... (takes a few seconds)</span>
+          <span class="copy-btn">&#128203;</span>
+        </div>
+        <div class="qr-box" id="tunnel-qr-box" style="display:none;">
+          <img id="tunnel-qr-img" alt="QR">
+        </div>
+        <div class="share-hint">Works from ANY device &mdash; no WiFi or network config needed</div>
+        <div class="tunnel-note" id="tunnel-note">
+          First visit may show a confirmation page &mdash; click "Continue" to proceed
+        </div>
       </div>
-      <div class="share-hint">Scan QR or open URL on devices on the same WiFi</div>
-      <details class="ip-list" id="ip-details" style="display:none;">
-        <summary>All network addresses</summary>
-        <div id="ip-list"></div>
-      </details>
+
+      <!-- LAN panel -->
+      <div class="share-panel" id="panel-lan">
+        <div class="url-box" id="lan-url-box" onclick="copyUrl('lan-url')">
+          <span class="url-text" id="lan-url">Detecting...</span>
+          <span class="copy-btn">&#128203;</span>
+        </div>
+        <div class="qr-box" id="lan-qr-box" style="display:none;">
+          <img id="lan-qr-img" alt="QR">
+        </div>
+        <div class="share-hint">Both devices must be on the same WiFi network</div>
+      </div>
     </div>
 
-    <!-- Upload -->
+    <!-- ── Upload ── -->
     <div class="card">
       <div class="card-title">Load Audio</div>
       <div class="upload-area" id="upload-area">
         <div class="icon">&#127925;</div>
-        <p>Tap to upload or drag audio file</p>
+        <p>Tap to upload or drag an audio file</p>
         <div class="formats">MP3 &middot; WAV &middot; OGG &middot; M4A &middot; AAC &middot; FLAC</div>
       </div>
       <input type="file" id="file-input" accept="audio/*">
     </div>
 
-    <!-- Tracks -->
+    <!-- ── Tracks ── -->
     <div class="card" id="tracks-card" style="display:none;">
       <div class="card-title">Tracks</div>
       <div id="tracks-list"></div>
     </div>
 
-    <!-- Player -->
+    <!-- ── Player ── -->
     <div class="card" id="player-card" style="display:none;">
       <div class="card-title">Now Playing</div>
       <div class="track-info">
@@ -319,15 +283,10 @@
           <div class="track-meta" id="track-meta">Ready</div>
         </div>
       </div>
-      <div class="progress-wrap">
-        <div class="progress-bg" id="progress-bg">
-          <div class="progress-fill" id="progress-fill"></div>
-        </div>
-        <div class="time-row">
-          <span id="time-cur">0:00</span>
-          <span id="time-total">0:00</span>
-        </div>
+      <div class="progress-bg" id="progress-bg">
+        <div class="progress-fill" id="progress-fill"></div>
       </div>
+      <div class="time-row"><span id="time-cur">0:00</span><span id="time-total">0:00</span></div>
       <div class="controls">
         <button class="ctrl-btn" id="btn-stop" title="Stop">&#9632;</button>
         <button class="ctrl-btn play-btn" id="btn-play" title="Play">&#9654;</button>
@@ -340,26 +299,18 @@
       </div>
     </div>
 
-    <!-- Devices -->
+    <!-- ── Devices ── -->
     <div class="card">
       <div class="card-title">Connected Devices</div>
       <div id="device-list"><div class="empty">Waiting for devices...</div></div>
-    </div>
-
-    <!-- Diagnostics -->
-    <div class="card" id="diag-card" style="display:none;">
-      <div class="card-title">Connection Diagnostics</div>
-      <div class="diag-log" id="diag-log"></div>
-      <button class="btn btn-full" onclick="runDiagnostics()" style="margin-top:8px;">Re-run diagnostics</button>
     </div>
   </div>
 
   <div class="toast" id="toast"></div>
 
-  <!-- Socket.IO client — served automatically by the Socket.IO server -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    // ── State ──────────────────────
+    // ── State ──────────
     let socket = null;
     let myClientId = null;
     let isHost = false;
@@ -373,93 +324,68 @@
     let currentTrackUrl = null;
     let progressRAF = null;
 
-    // ── DOM ────────────────────────
+    // ── DOM ────────────
     const $ = s => document.querySelector(s);
-    const connDot = $('#conn-dot');
-    const connText = $('#conn-text');
-    const syncDot = $('#sync-dot');
-    const syncLabel = $('#sync-label');
-    const shareUrl = $('#share-url');
-    const shareUrlBox = $('#share-url-box');
-    const qrWrap = $('#qr-wrap');
-    const qrImg = $('#qr-img');
-    const ipDetails = $('#ip-details');
-    const ipList = $('#ip-list');
-    const uploadArea = $('#upload-area');
-    const fileInput = $('#file-input');
-    const tracksCard = $('#tracks-card');
-    const tracksList = $('#tracks-list');
+    const connDot = $('#conn-dot'), connText = $('#conn-text');
+    const syncDot = $('#sync-dot'), syncLabel = $('#sync-label');
+    const tunnelUrlEl = $('#tunnel-url'), tunnelQrBox = $('#tunnel-qr-box'), tunnelQrImg = $('#tunnel-qr-img');
+    const lanUrlEl = $('#lan-url'), lanQrBox = $('#lan-qr-box'), lanQrImg = $('#lan-qr-img');
+    const tunnelNote = $('#tunnel-note');
+    const uploadArea = $('#upload-area'), fileInput = $('#file-input');
+    const tracksCard = $('#tracks-card'), tracksList = $('#tracks-list');
     const playerCard = $('#player-card');
-    const trackName = $('#track-name');
-    const trackMeta = $('#track-meta');
-    const progressBg = $('#progress-bg');
-    const progressFill = $('#progress-fill');
-    const timeCur = $('#time-cur');
-    const timeTotal = $('#time-total');
-    const btnPlay = $('#btn-play');
-    const btnStop = $('#btn-stop');
-    const btnResync = $('#btn-resync');
+    const trackName = $('#track-name'), trackMeta = $('#track-meta');
+    const progressBg = $('#progress-bg'), progressFill = $('#progress-fill');
+    const timeCur = $('#time-cur'), timeTotal = $('#time-total');
+    const btnPlay = $('#btn-play'), btnStop = $('#btn-stop'), btnResync = $('#btn-resync');
     const volumeSlider = $('#volume');
     const deviceList = $('#device-list');
-    const diagCard = $('#diag-card');
-    const diagLog = $('#diag-log');
     const toastEl = $('#toast');
 
-    // ── Helpers ────────────────────
-    function fmt(sec) {
-      if (!sec || isNaN(sec)) return '0:00';
-      const m = Math.floor(sec / 60);
-      const s = Math.floor(sec % 60);
-      return `${m}:${s.toString().padStart(2, '0')}`;
-    }
+    // ── Helpers ────────
+    function fmt(s) { if(!s||isNaN(s))return '0:00'; return `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,'0')}`; }
+    function showToast(t) { toastEl.textContent=t; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'),2500); }
 
-    function showToast(text) {
-      toastEl.textContent = text;
-      toastEl.classList.add('show');
-      setTimeout(() => toastEl.classList.remove('show'), 2500);
-    }
-
-    function dlog(msg, type = 'info') {
-      const c = { ok: '#00b894', fail: '#e17055', info: '#8888a8', warn: '#fdcb6e' };
-      const p = { ok: 'OK', fail: 'FAIL', info: '--', warn: '!!' };
-      const d = document.createElement('div');
-      d.innerHTML = `<span style="color:${c[type]}">[${p[type]}]</span> ${msg}`;
-      diagLog.appendChild(d);
-      diagLog.scrollTop = diagLog.scrollHeight;
-    }
-
-    // ── Audio Context ──────────────
     function ensureAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        gainNode = audioCtx.createGain();
-        gainNode.connect(audioCtx.destination);
-      }
+      if (!audioCtx) { audioCtx = new (window.AudioContext||window.webkitAudioContext)(); gainNode = audioCtx.createGain(); gainNode.connect(audioCtx.destination); }
       if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
-    // ── Socket.IO connection ───────
+    // ── Share tabs ─────
+    function switchShareTab(panel) {
+      document.querySelectorAll('.share-tab').forEach(t => t.classList.toggle('active', t.dataset.panel === panel));
+      document.querySelectorAll('.share-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${panel}`));
+    }
+
+    function copyUrl(elId) {
+      const url = $(`#${elId}`).textContent;
+      if (url.includes('...') || url.includes('Detecting')) return;
+      navigator.clipboard.writeText(url).then(() => showToast('URL copied!')).catch(() => {
+        const ta = document.createElement('textarea'); ta.value = url;
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta); showToast('URL copied!');
+      });
+    }
+
+    // ── Socket.IO ─────
     function initSocket() {
-      // Socket.IO auto-detects the server URL from the page origin.
-      // It will try WebSocket first, fall back to HTTP long-polling.
+      // Socket.IO auto-connects to the same origin that served this page.
+      // It tries WebSocket first, falls back to HTTP long-polling automatically.
+      // Handles reconnection, heartbeat, proxy traversal — all built-in.
       socket = io({
         transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        timeout: 10000
+        timeout: 10000,
+        // Required to bypass localtunnel reminder on some browsers
+        extraHeaders: { 'bypass-tunnel-reminder': 'true' }
       });
 
       socket.on('connect', () => {
         connDot.classList.add('ok');
         connText.textContent = 'Connected';
-        const t = socket.io.engine.transport.name;
-        dlog(`Connected via ${t}`, 'ok');
-      });
-
-      socket.io.engine && socket.io.engine.on && socket.io.engine.on('upgrade', (t) => {
-        dlog(`Transport upgraded to ${t.name}`, 'ok');
       });
 
       socket.on('disconnect', (reason) => {
@@ -467,346 +393,188 @@
         connText.textContent = 'Reconnecting...';
         syncDot.className = 'sync-dot error';
         syncLabel.innerHTML = `Disconnected <small>${reason}</small>`;
-        dlog(`Disconnected: ${reason}`, 'warn');
       });
 
       socket.on('connect_error', (err) => {
         connDot.classList.remove('ok');
-        connText.textContent = 'Connection failed';
-        dlog(`Connection error: ${err.message}`, 'fail');
-        diagCard.style.display = '';
-      });
-
-      socket.on('reconnect_attempt', (n) => {
-        connText.textContent = `Retry #${n}...`;
+        connText.textContent = 'Retrying...';
       });
 
       socket.on('reconnect', () => {
         connDot.classList.add('ok');
         connText.textContent = 'Reconnected';
-        showToast('Reconnected to server');
+        showToast('Reconnected');
       });
 
-      // ── App events ──────────────────
-      socket.on('welcome', (data) => {
-        myClientId = data.clientId;
-        isHost = data.isHost;
-        connText.textContent = `Device #${data.clientId}`;
-        if (data.currentTrack) loadTrack(data.currentTrack.url, data.currentTrack.filename);
+      // ── App events ──
+      socket.on('welcome', (d) => {
+        myClientId = d.clientId;
+        isHost = d.isHost;
+        connText.textContent = `Device #${d.clientId}`;
+        if (d.currentTrack) loadTrack(d.currentTrack.url, d.currentTrack.filename);
       });
 
-      socket.on('you-are-host', () => {
-        isHost = true;
-        showToast('You are now the host');
-      });
+      socket.on('you-are-host', () => { isHost = true; showToast('You are now the host'); });
 
-      socket.on('clock-ping', (data) => {
-        socket.emit('clock-pong', { t0: data.t0, clientTime: Date.now() });
+      socket.on('clock-ping', (d) => {
+        socket.emit('clock-pong', { t0: d.t0, clientTime: Date.now() });
         syncDot.className = 'sync-dot';
-        syncLabel.innerHTML = 'Synchronizing... <small>measuring offset</small>';
+        syncLabel.innerHTML = 'Syncing... <small>measuring</small>';
       });
 
-      socket.on('sync-done', (data) => {
+      socket.on('sync-done', (d) => {
         syncDot.className = 'sync-dot synced';
-        syncLabel.innerHTML = `Synced <small>offset: ${Math.round(data.offset)}ms, RTT: ${data.rtt}ms</small>`;
+        syncLabel.innerHTML = `Synced <small>offset: ${Math.round(d.offset)}ms, RTT: ${d.rtt}ms</small>`;
         socket.emit('ready');
       });
 
-      socket.on('track-loaded', (data) => {
-        loadTrack(data.url, data.filename);
-      });
+      socket.on('track-loaded', (d) => loadTrack(d.url, d.filename));
 
-      socket.on('play-at', (data) => {
+      socket.on('play-at', (d) => {
         ensureAudio();
-        const now = Date.now();
-        const delay = data.time - now;
-        const seekTo = data.seekTo || 0;
-
-        if (delay > 0) {
-          setTimeout(() => startPlayback(seekTo), delay);
-        } else {
-          startPlayback(seekTo + Math.abs(delay) / 1000);
-        }
+        const delay = d.time - Date.now();
+        const seekTo = d.seekTo || 0;
+        if (delay > 0) setTimeout(() => startPlayback(seekTo), delay);
+        else startPlayback(seekTo + Math.abs(delay) / 1000);
       });
 
       socket.on('pause', () => pausePlayback());
       socket.on('stop', () => stopPlayback());
+      socket.on('set-volume', (d) => { volumeSlider.value = d.volume; if (gainNode) gainNode.gain.value = d.volume; });
 
-      socket.on('set-volume', (data) => {
-        volumeSlider.value = data.volume;
-        if (gainNode) gainNode.gain.value = data.volume;
-      });
-
-      socket.on('client-count', (data) => {
+      socket.on('client-count', (d) => {
         connText.textContent = isHost
-          ? `Host \u00b7 ${data.count} device${data.count > 1 ? 's' : ''}`
-          : `Device #${myClientId} \u00b7 ${data.count} connected`;
+          ? `Host \u00b7 ${d.count} device${d.count>1?'s':''}`
+          : `Device #${myClientId} \u00b7 ${d.count} connected`;
       });
 
-      socket.on('device-list', (data) => renderDevices(data.devices));
+      socket.on('device-list', (d) => renderDevices(d.devices));
+
+      // Tunnel URL pushed from server
+      socket.on('tunnel-ready', (d) => {
+        if (d.tunnelUrl) updateTunnelUI(d.tunnelUrl, d.tunnelQrDataUrl);
+      });
     }
 
-    // ── Track loading ──────────────
+    // ── Track loading ──
     async function loadTrack(url, filename) {
-      ensureAudio();
-      currentTrackUrl = url;
-      trackName.textContent = filename;
-      trackMeta.textContent = 'Loading...';
+      ensureAudio(); currentTrackUrl = url;
+      trackName.textContent = filename; trackMeta.textContent = 'Loading...';
       playerCard.style.display = '';
-
       try {
-        const res = await fetch(url);
-        const buf = await res.arrayBuffer();
+        const buf = await (await fetch(url)).arrayBuffer();
         audioBuffer = await audioCtx.decodeAudioData(buf);
         trackMeta.textContent = `${fmt(audioBuffer.duration)} \u00b7 ${audioBuffer.numberOfChannels}ch \u00b7 ${audioBuffer.sampleRate}Hz`;
         timeTotal.textContent = fmt(audioBuffer.duration);
-        progressFill.style.width = '0%';
-        timeCur.textContent = '0:00';
+        progressFill.style.width = '0%'; timeCur.textContent = '0:00';
         showToast(`Loaded: ${filename}`);
         socket.emit('ready');
-      } catch (err) {
-        trackMeta.textContent = 'Failed to load';
-        console.error(err);
-      }
+      } catch (e) { trackMeta.textContent = 'Failed to load'; console.error(e); }
       loadTrackList();
     }
 
-    // ── Playback ───────────────────
+    // ── Playback ───────
     function startPlayback(seekTo = 0) {
-      if (!audioBuffer) return;
-      ensureAudio();
-
+      if (!audioBuffer) return; ensureAudio();
       if (sourceNode) { try { sourceNode.stop(); } catch {} }
-
       sourceNode = audioCtx.createBufferSource();
       sourceNode.buffer = audioBuffer;
       sourceNode.connect(gainNode);
-
-      const offset = Math.min(seekTo, audioBuffer.duration);
-      sourceNode.start(0, offset);
-      isPlaying = true;
-      playStartTime = Date.now();
-      playStartOffset = offset;
-      btnPlay.innerHTML = '&#10074;&#10074;';
-      trackMeta.textContent = 'Playing (synced)';
+      const off = Math.min(seekTo, audioBuffer.duration);
+      sourceNode.start(0, off);
+      isPlaying = true; playStartTime = Date.now(); playStartOffset = off;
+      btnPlay.innerHTML = '&#10074;&#10074;'; trackMeta.textContent = 'Playing (synced)';
       updateProgress();
-
-      sourceNode.onended = () => {
-        if (isPlaying) {
-          isPlaying = false;
-          btnPlay.innerHTML = '&#9654;';
-          progressFill.style.width = '100%';
-          cancelAnimationFrame(progressRAF);
-        }
-      };
+      sourceNode.onended = () => { if (isPlaying) { isPlaying = false; btnPlay.innerHTML = '&#9654;'; progressFill.style.width = '100%'; cancelAnimationFrame(progressRAF); } };
     }
+    function pausePlayback() { if (sourceNode&&isPlaying) { try{sourceNode.stop();}catch{} } isPlaying=false; btnPlay.innerHTML='&#9654;'; cancelAnimationFrame(progressRAF); }
+    function stopPlayback() { if(sourceNode){try{sourceNode.stop();}catch{}} isPlaying=false; playStartOffset=0; btnPlay.innerHTML='&#9654;'; progressFill.style.width='0%'; timeCur.textContent='0:00'; trackMeta.textContent='Stopped'; cancelAnimationFrame(progressRAF); }
+    function getCurTime() { return isPlaying ? playStartOffset+(Date.now()-playStartTime)/1000 : playStartOffset; }
+    function updateProgress() { if(!isPlaying||!audioBuffer)return; const t=getCurTime(); progressFill.style.width=Math.min(t/audioBuffer.duration*100,100)+'%'; timeCur.textContent=fmt(t); progressRAF=requestAnimationFrame(updateProgress); }
 
-    function pausePlayback() {
-      if (sourceNode && isPlaying) { try { sourceNode.stop(); } catch {} }
-      isPlaying = false;
-      btnPlay.innerHTML = '&#9654;';
-      cancelAnimationFrame(progressRAF);
-    }
-
-    function stopPlayback() {
-      if (sourceNode) { try { sourceNode.stop(); } catch {} }
-      isPlaying = false;
-      playStartOffset = 0;
-      btnPlay.innerHTML = '&#9654;';
-      progressFill.style.width = '0%';
-      timeCur.textContent = '0:00';
-      trackMeta.textContent = 'Stopped';
-      cancelAnimationFrame(progressRAF);
-    }
-
-    function getCurTime() {
-      if (!isPlaying) return playStartOffset;
-      return playStartOffset + (Date.now() - playStartTime) / 1000;
-    }
-
-    function updateProgress() {
-      if (!isPlaying || !audioBuffer) return;
-      const t = getCurTime();
-      progressFill.style.width = Math.min(t / audioBuffer.duration * 100, 100) + '%';
-      timeCur.textContent = fmt(t);
-      progressRAF = requestAnimationFrame(updateProgress);
-    }
-
-    // ── Track list ─────────────────
+    // ── Track list ─────
     async function loadTrackList() {
       try {
-        const res = await fetch('/tracks');
-        const tracks = await res.json();
-        if (!tracks.length) { tracksCard.style.display = 'none'; return; }
+        const tracks = await (await fetch('/tracks')).json();
+        if (!tracks.length) { tracksCard.style.display='none'; return; }
         tracksCard.style.display = '';
-        tracksList.innerHTML = tracks.map(t => `
-          <div class="track-item ${t.url === currentTrackUrl ? 'active' : ''}"
-               onclick="selectTrack('${t.url}','${t.filename.replace(/'/g,"\\'")}')">
-            <span class="icon">&#9835;</span>
-            <span class="name">${t.filename}</span>
-          </div>`).join('');
+        tracksList.innerHTML = tracks.map(t =>
+          `<div class="track-item ${t.url===currentTrackUrl?'active':''}" onclick="selectTrack('${t.url}','${t.filename.replace(/'/g,"\\'")}')">
+            <span class="icon">&#9835;</span><span class="name">${t.filename}</span></div>`
+        ).join('');
       } catch {}
     }
+    function selectTrack(u,f) { socket.emit('select-track',{url:u,filename:f}); }
 
-    function selectTrack(url, filename) {
-      socket.emit('select-track', { url, filename });
-    }
-
-    // ── Device list ────────────────
-    function renderDevices(devices) {
-      if (!devices || !devices.length) {
-        deviceList.innerHTML = '<div class="empty">Waiting for devices...</div>';
-        return;
-      }
-      deviceList.innerHTML = devices.map(d => `
-        <div class="device-item">
-          <div class="device-icon">${d.isHost ? '&#9733;' : '&#128266;'}</div>
+    // ── Device list ────
+    function renderDevices(devs) {
+      if (!devs||!devs.length) { deviceList.innerHTML='<div class="empty">Waiting for devices...</div>'; return; }
+      deviceList.innerHTML = devs.map(d =>
+        `<div class="device-item">
+          <div class="device-icon">${d.isHost?'&#9733;':'&#128266;'}</div>
           <div class="device-details">
-            <div class="device-name">${d.name}${d.id === myClientId ? ' (You)' : ''}</div>
-            <div class="device-status">Offset: ${d.offset}ms \u00b7 ${d.ready ? 'Ready' : 'Syncing...'}</div>
+            <div class="device-name">${d.name}${d.id===myClientId?' (You)':''}</div>
+            <div class="device-status">Offset: ${d.offset}ms \u00b7 ${d.ready?'Ready':'Syncing...'}</div>
           </div>
-          ${d.isHost ? '<span class="host-badge">HOST</span>' : ''}
-        </div>`).join('');
+          ${d.isHost?'<span class="host-badge">HOST</span>':''}</div>`
+      ).join('');
     }
 
-    // ── Connection info ────────────
+    // ── Connection info ─
+    function updateTunnelUI(url, qr) {
+      tunnelUrlEl.textContent = url;
+      tunnelUrlEl.classList.remove('pending');
+      if (qr) { tunnelQrImg.src = qr; tunnelQrBox.style.display = ''; }
+    }
+
     async function loadConnectionInfo() {
       const cur = location.origin;
-
-      // Use current URL if already accessed via IP
-      if (!/localhost|127\.0\.0\.1/.test(location.hostname)) {
-        shareUrl.textContent = cur;
-      }
+      if (!/localhost|127\.0\.0\.1/.test(location.hostname)) lanUrlEl.textContent = cur;
 
       try {
-        const res = await fetch('/connection-info');
-        const info = await res.json();
+        const info = await (await fetch('/connection-info')).json();
 
-        // QR code (server-generated, reliable)
-        if (info.qrDataUrl) {
-          qrImg.src = info.qrDataUrl;
-          qrWrap.style.display = '';
+        // Tunnel
+        if (info.tunnelUrl) {
+          updateTunnelUI(info.tunnelUrl, info.tunnelQrDataUrl);
         }
 
-        if (info.ips && info.ips.length > 0) {
-          const primary = `http://${info.ips[0].address}:${info.port}`;
-          if (/localhost|127\.0\.0\.1/.test(location.hostname)) {
-            shareUrl.textContent = primary;
-          }
-
-          if (info.ips.length > 0) {
-            ipDetails.style.display = '';
-            ipList.innerHTML = info.ips.map(ip =>
-              `<div class="ip-item">http://${ip.address}:${info.port} <span>(${ip.name})</span></div>`
-            ).join('');
-          }
-        } else {
-          shareUrl.textContent = cur;
-          ipDetails.style.display = '';
-          ipList.innerHTML = '<div class="ip-item" style="color:var(--warning)">No network interfaces found. Check WiFi connection.</div>';
+        // LAN
+        if (info.lanUrl) {
+          if (/localhost|127\.0\.0\.1/.test(location.hostname)) lanUrlEl.textContent = info.lanUrl;
+          if (info.lanQrDataUrl) { lanQrImg.src = info.lanQrDataUrl; lanQrBox.style.display = ''; }
         }
-      } catch {
-        shareUrl.textContent = cur;
+      } catch { lanUrlEl.textContent = cur; }
+
+      // Poll for tunnel URL if not ready yet
+      if (!tunnelUrlEl.textContent || tunnelUrlEl.classList.contains('pending')) {
+        setTimeout(loadConnectionInfo, 3000);
       }
     }
 
-    // ── Diagnostics ────────────────
-    async function runDiagnostics() {
-      diagLog.innerHTML = '';
-      diagCard.style.display = '';
-      dlog(`Page: ${location.href}`, 'info');
-      dlog(`Protocol: ${location.protocol}`, 'info');
-
-      if (location.protocol === 'https:') {
-        dlog('HTTPS detected \u2014 WebSocket needs wss:// (SSL on server)', 'fail');
-        dlog('Try accessing via http:// instead', 'warn');
-      }
-
-      try {
-        const r = await fetch('/health', { signal: AbortSignal.timeout(5000) });
-        if (r.ok) {
-          const d = await r.json();
-          dlog(`HTTP OK \u2014 ${d.clients} clients, port ${d.port}`, 'ok');
-        } else {
-          dlog(`HTTP status ${r.status}`, 'fail');
-        }
-      } catch (e) {
-        dlog(`HTTP failed: ${e.message}`, 'fail');
-        return;
-      }
-
-      dlog(`Socket.IO state: ${socket ? socket.connected ? 'connected' : 'disconnected' : 'not initialized'}`, socket?.connected ? 'ok' : 'fail');
-      if (socket && socket.io && socket.io.engine) {
-        dlog(`Transport: ${socket.io.engine.transport.name}`, 'info');
-      }
-
-      try {
-        const r = await fetch('/connection-info');
-        const info = await r.json();
-        for (const ip of (info.ips || [])) {
-          dlog(`Server IP: ${ip.address} (${ip.name})`, 'info');
-        }
-      } catch {}
-    }
-
-    // ── Event handlers ─────────────
+    // ── Events ─────────
     uploadArea.addEventListener('click', () => { ensureAudio(); fileInput.click(); });
     fileInput.addEventListener('change', e => { if (e.target.files[0]) uploadFile(e.target.files[0]); });
     uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
     uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-    uploadArea.addEventListener('drop', e => {
-      e.preventDefault(); uploadArea.classList.remove('dragover');
-      if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
-    });
+    uploadArea.addEventListener('drop', e => { e.preventDefault(); uploadArea.classList.remove('dragover'); if(e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]); });
 
     async function uploadFile(file) {
-      const form = new FormData();
-      form.append('audio', file);
-      try {
-        const r = await fetch('/upload', { method: 'POST', body: form });
-        const d = await r.json();
-        if (!d.success) showToast('Upload failed');
-      } catch { showToast('Upload failed'); }
+      const form = new FormData(); form.append('audio', file);
+      try { const d = await (await fetch('/upload',{method:'POST',body:form})).json(); if(!d.success) showToast('Upload failed'); }
+      catch { showToast('Upload failed'); }
     }
 
-    btnPlay.addEventListener('click', () => {
-      ensureAudio();
-      if (!audioBuffer) return showToast('Load a track first');
-      socket.emit(isPlaying ? 'pause' : 'play', { seekTo: 0 });
-    });
-
+    btnPlay.addEventListener('click', () => { ensureAudio(); if(!audioBuffer) return showToast('Load a track first'); socket.emit(isPlaying?'pause':'play',{seekTo:0}); });
     btnStop.addEventListener('click', () => socket.emit('stop'));
     btnResync.addEventListener('click', () => { socket.emit('resync'); showToast('Re-syncing...'); });
+    volumeSlider.addEventListener('input', e => { const v=parseFloat(e.target.value); if(gainNode)gainNode.gain.value=v; socket.emit('set-volume',{volume:v}); });
+    progressBg.addEventListener('click', e => { if(!audioBuffer)return; socket.emit('play',{seekTo:(e.clientX-progressBg.getBoundingClientRect().left)/progressBg.offsetWidth*audioBuffer.duration}); });
 
-    volumeSlider.addEventListener('input', e => {
-      const v = parseFloat(e.target.value);
-      if (gainNode) gainNode.gain.value = v;
-      socket.emit('set-volume', { volume: v });
-    });
-
-    progressBg.addEventListener('click', e => {
-      if (!audioBuffer) return;
-      const pct = (e.clientX - progressBg.getBoundingClientRect().left) / progressBg.offsetWidth;
-      socket.emit('play', { seekTo: pct * audioBuffer.duration });
-    });
-
-    shareUrlBox.addEventListener('click', async () => {
-      const url = shareUrl.textContent;
-      try {
-        await navigator.clipboard.writeText(url);
-        showToast('URL copied!');
-      } catch {
-        const ta = document.createElement('textarea');
-        ta.value = url; document.body.appendChild(ta); ta.select();
-        document.execCommand('copy'); document.body.removeChild(ta);
-        showToast('URL copied!');
-      }
-    });
-
-    // ── Init ───────────────────────
     document.addEventListener('click', () => ensureAudio(), { once: true });
     document.addEventListener('touchstart', () => ensureAudio(), { once: true });
 
+    // ── Init ───────────
     initSocket();
     loadTrackList();
     loadConnectionInfo();
