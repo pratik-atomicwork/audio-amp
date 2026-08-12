@@ -1,0 +1,10 @@
+{
+  "name": "playlist-player",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Full-screen image player driven by a hidden YouTube playlist embed with custom controls",
+  "scripts": {
+    "start": "node serve.js",
+    "dev": "node serve.js"
+  }
+}
